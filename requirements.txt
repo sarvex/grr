@@ -1,7 +1,7 @@
 Django==1.7.1
 Flask-Sockets==0.1
 Flask==2.3.2
-Jinja2==2.7.3
+Jinja2==2.11.3
 MarkupSafe==0.23
 PyYAML==3.11
 Werkzeug==2.2.3
