@@ -23,8 +23,7 @@ class NotificationCount(renderers.TemplateRenderer):
     try:
       user_fd = aff4.FACTORY.Open(aff4.ROOT_URN.Add("users").Add(
           request.user), token=request.token)
-      notifications = user_fd.Get(user_fd.Schema.PENDING_NOTIFICATIONS)
-      if notifications:
+      if notifications := user_fd.Get(user_fd.Schema.PENDING_NOTIFICATIONS):
         number = len(notifications)
     except IOError:
       pass
@@ -218,12 +217,7 @@ class ViewNotifications(renderers.TableRenderer):
     """Navigate to the most appropriate location for this navigation."""
     h = {}
 
-    # Still display if subject doesn't get set, this will appear in the GUI with
-    # a target of "None"
-    urn = "/"
-    if notification.subject is not None:
-      urn = notification.subject
-
+    urn = notification.subject if notification.subject is not None else "/"
     # General Host information
     if notification.type == "Discovery":
       path = rdfvalue.RDFURN(urn)

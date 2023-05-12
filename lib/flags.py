@@ -20,30 +20,32 @@ FLAGS = None
 # Helper functions for setting options on the global parser object
 # pylint: disable=g-bad-name,redefined-builtin
 def DEFINE_string(longopt, default, help):
-  PARSER.add_argument("--%s" % longopt, default=default, type=str,
-                      help=help)
+  PARSER.add_argument(f"--{longopt}", default=default, type=str, help=help)
 
 
 def DEFINE_bool(longopt, default, help):
-  PARSER.add_argument("--%s" % longopt, dest=longopt, action="store_true",
+  PARSER.add_argument(f"--{longopt}",
+                      dest=longopt,
+                      action="store_true",
                       help=help)
 
   PARSER.set_defaults(**{longopt: default})
 
 
 def DEFINE_integer(longopt, default, help):
-  PARSER.add_argument("--%s" % longopt, default=default, type=int,
-                      help=help)
+  PARSER.add_argument(f"--{longopt}", default=default, type=int, help=help)
 
 
 def DEFINE_float(longopt, default, help):
-  PARSER.add_argument("--%s" % longopt, default=default, type=float,
-                      help=help)
+  PARSER.add_argument(f"--{longopt}", default=default, type=float, help=help)
 
 
 def DEFINE_enum(longopt, default, choices, help, type=unicode):
-  PARSER.add_argument("--%s" % longopt, default=default, choices=choices,
-                      type=type, help=help)
+  PARSER.add_argument(f"--{longopt}",
+                      default=default,
+                      choices=choices,
+                      type=type,
+                      help=help)
 
 
 class ListParser(argparse.Action):
@@ -54,8 +56,10 @@ class ListParser(argparse.Action):
 
 
 def DEFINE_list(longopt, default, help):
-  PARSER.add_argument("--%s" % longopt, default=default,
-                      action=ListParser, help=help)
+  PARSER.add_argument(f"--{longopt}",
+                      default=default,
+                      action=ListParser,
+                      help=help)
 
 
 DEFINE_bool("verbose", default=False,

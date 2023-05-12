@@ -60,13 +60,10 @@ class Find(actions.IteratedAction):
       # Skip the files we already did before
       if i < start: continue
 
-      if stat.S_ISDIR(file_stat.st_mode):
-        # Do not traverse directories in a different filesystem.
-        if self.request.cross_devs or self.filesystem_id == file_stat.st_dev:
-          for child_stat in self.ListDirectory(file_stat.pathspec,
-                                               state, depth + 1):
-            yield child_stat
-
+      if stat.S_ISDIR(
+          file_stat.st_mode) and (self.request.cross_devs
+                                  or self.filesystem_id == file_stat.st_dev):
+        yield from self.ListDirectory(file_stat.pathspec, state, depth + 1)
       state[pathspec.CollapsePath()] = i + 1
       yield file_stat
 
@@ -105,11 +102,8 @@ class Find(actions.IteratedAction):
       return False
 
     # Content regex test.
-    if (self.request.HasField("data_regex") and
-        not self.TestFileContent(file_stat)):
-      return False
-
-    return True
+    return bool(not self.request.HasField("data_regex")
+                or self.TestFileContent(file_stat))
 
   def TestFileContent(self, file_stat):
     """Checks the file for the presence of the regular expression."""
@@ -300,11 +294,11 @@ class Grep(actions.ActionPlugin):
         if end + base_offset - preamble_size > args.start_offset + args.length:
           break
 
-        out_data = ""
-        for i in xrange(max(0, start - args.bytes_before),
-                        min(len(data), end + args.bytes_after)):
-          out_data += chr(ord(data[i]) ^ self.xor_out_key)
-
+        out_data = "".join(
+            chr(ord(data[i]) ^ self.xor_out_key) for i in xrange(
+                max(0, start - args.bytes_before),
+                min(len(data), end + args.bytes_after),
+            ))
         hits += 1
         self.SendReply(offset=base_offset + start - preamble_size,
                        data=out_data, length=len(out_data),

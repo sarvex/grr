@@ -10,29 +10,27 @@ class ApiDocsRenderer(api_call_renderers.ApiCallRenderer):
   """Renders HTTP API docs sources."""
 
   def RenderApiCallRenderers(self, routing_rules):
-    result = {}
-    for rule in routing_rules:
-      result[rule.rule] = dict(route=rule.rule,
-                               renderer=rule.endpoint.__name__,
-                               methods=list(rule.methods - set(["HEAD"])),
-                               doc=rule.endpoint.__doc__,
-                               args_type=(rule.endpoint.args_type and
-                                          rule.endpoint.args_type.__name__))
-
-    return result
+    return {
+        rule.rule: dict(
+            route=rule.rule,
+            renderer=rule.endpoint.__name__,
+            methods=list(rule.methods - {"HEAD"}),
+            doc=rule.endpoint.__doc__,
+            args_type=(rule.endpoint.args_type
+                       and rule.endpoint.args_type.__name__),
+        )
+        for rule in routing_rules
+    }
 
   def RenderApiObjectRenderers(self, renderers):
-    result = {}
-    for renderer in renderers:
-      if not renderer.aff4_type:
-        continue
-
-      result[renderer.aff4_type] = dict(
-          name=renderer.__name__,
-          doc=renderer.__doc__,
-          args_type=renderer.args_type and renderer.args_type.__name__)
-
-    return result
+    return {
+        renderer.aff4_type: dict(
+            name=renderer.__name__,
+            doc=renderer.__doc__,
+            args_type=renderer.args_type and renderer.args_type.__name__,
+        )
+        for renderer in renderers if renderer.aff4_type
+    }
 
   def Render(self, unused_args, token=None):
     routing_rules = sorted(

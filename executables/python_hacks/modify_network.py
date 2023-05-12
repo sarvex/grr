@@ -22,10 +22,10 @@ def NetshStaticIp(interface, ip=u'127.0.0.9', subnet=u'255.255.255.255',
   """
   args = ['/c', 'netsh', 'interface', 'ip', 'set', 'address',
           interface, 'static', ip, subnet, gw, '1']
-  # pylint: disable=undefined-variable
-  res = client_utils_common.Execute('cmd', args,
-                                    time_limit=-1, bypass_whitelist=True)
-  return res
+  return client_utils_common.Execute('cmd',
+                                     args,
+                                     time_limit=-1,
+                                     bypass_whitelist=True)
 
 
 def DisableInterfaces(interface):
@@ -40,13 +40,12 @@ def DisableInterfaces(interface):
   set_tested_versions = ['vista', '2008']
   set_args = ['/c', 'netsh', 'set', 'interface', interface, 'DISABLED']
   host_version = platform.platform().lower()
-  for version in set_tested_versions:
-    if host_version.find(version) != -1:
-      # pylint: disable=undefined-variable
-      res = client_utils_common.Execute('cmd', set_args,
-                                        time_limit=-1, bypass_whitelist=True)
-      return res
-  return ('', 'Command not available for this version.', 99, '')
+  return next(
+      (client_utils_common.Execute(
+          'cmd', set_args, time_limit=-1, bypass_whitelist=True)
+       for version in set_tested_versions if host_version.find(version) != -1),
+      ('', 'Command not available for this version.', 99, ''),
+  )
 
 
 def GetEnabledInterfaces():
@@ -84,52 +83,46 @@ def MsgUser(msg):
     return ('Command not ran.', 'Empty message.', -1)
   else:
     msg_args.extend([msg])
-  for version in msg_tested_versions:
-    if host_version.find(version) != -1:
-      # pylint: disable=undefined-variable
-      res = client_utils_common.Execute('cmd', msg_args,
-                                        time_limit=-1, bypass_whitelist=True)
-      return res
-  return ('', 'Command not available for this version.', -1)
+  return next(
+      (client_utils_common.Execute(
+          'cmd', msg_args, time_limit=-1, bypass_whitelist=True)
+       for version in msg_tested_versions if host_version.find(version) != -1),
+      ('', 'Command not available for this version.', -1),
+  )
 
 
 def main():
   return_str = {}
-  # pylint: disable=g-bad-name
-  MSG_STRING = ('***WARNING for Acme Corp Security***\n'
-                'Your machine was found to be infected with a \n'
-                'very scary virus. As a security measure we are \n'
-                'shutting down your internet connection. Please \n'
-                'call 0800-OHNOES immediately.')
   # pylint: disable=undefined-variable
   if 'msg' in py_args:
     return_str['msg'] = MsgUser(py_args['msg'])
   else:
+    # pylint: disable=g-bad-name
+    MSG_STRING = ('***WARNING for Acme Corp Security***\n'
+                  'Your machine was found to be infected with a \n'
+                  'very scary virus. As a security measure we are \n'
+                  'shutting down your internet connection. Please \n'
+                  'call 0800-OHNOES immediately.')
     return_str['msg'] = MsgUser(MSG_STRING)
 
   for interface in GetEnabledInterfaces():
-    if interface != 'Loopback' or interface != 'Internal':
-      return_str[interface] = DisableInterfaces(interface)
+    return_str[interface] = DisableInterfaces(interface)
       # Disabaling interface is not available.
       # Change interface config to be unroutable.
-      if return_str[interface][2] == 99:
-        if all([key in py_args for key in ['ip', 'subnet', 'gw']]):
-          return_str[interface] = NetshStaticIp(interface,
-                                                py_args['ip'],
-                                                py_args['subnet'],
-                                                py_args['gw'])
-        else:
-          return_str[interface] = NetshStaticIp(interface)
+    if return_str[interface][2] == 99:
+      if all(key in py_args for key in ['ip', 'subnet', 'gw']):
+        return_str[interface] = NetshStaticIp(interface,
+                                              py_args['ip'],
+                                              py_args['subnet'],
+                                              py_args['gw'])
+      else:
+        return_str[interface] = NetshStaticIp(interface)
 
   # Build magic string.
   magic_list = []
   for key in return_str:
     stdout, stderr, exit_status, time_taken = return_str[key]
-    key_str = '%s, %s, %s, %s, %s' % (key,
-                                      stdout.encode('base64'),
-                                      stderr.encode('base64'),
-                                      exit_status,
-                                      time_taken)
+    key_str = f"{key}, {stdout.encode('base64')}, {stderr.encode('base64')}, {exit_status}, {time_taken}"
     magic_list.append(key_str)
 
   magic_return_str = ''.join(magic_list)  # pylint: disable=unused-variable

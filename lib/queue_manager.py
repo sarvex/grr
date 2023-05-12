@@ -127,8 +127,8 @@ class QueueManager(object):
 
   def GetAllNotificationShards(self, queue):
     result = [queue]
-    for i in range(1, self.num_notification_shards):
-      result.append(queue.Add(str(i)))
+    result.extend(
+        queue.Add(str(i)) for i in range(1, self.num_notification_shards))
     return result
 
   def Copy(self):
@@ -198,11 +198,11 @@ class QueueManager(object):
         request_nr = int(predicate.split(":")[-1], 16)
         statuses_found.setdefault(subject, set()).add(request_nr)
 
-    status_available = set()
-    for m in messages:
-      if m.request_id in statuses_found.get(m.session_id.Add("state"), set()):
-        status_available.add(m)
-    return status_available
+    return {
+        m
+        for m in messages
+        if m.request_id in statuses_found.get(m.session_id.Add("state"), set())
+    }
 
   def FetchCompletedRequests(self, session_id, timestamp=None):
     """Fetch all the requests with a status message queued for them."""
@@ -252,10 +252,10 @@ class QueueManager(object):
         timestamp=timestamp))
 
     for response_urn, request in sorted(response_subjects.items()):
-      responses = []
-      for _, serialized, _ in response_data.get(response_urn, []):
-        responses.append(rdfvalue.GrrMessage(serialized))
-
+      responses = [
+          rdfvalue.GrrMessage(serialized)
+          for _, serialized, _ in response_data.get(response_urn, [])
+      ]
       yield (request, sorted(responses, key=lambda msg: msg.response_id))
 
     # Indicate to the caller that there are more messages.
@@ -303,10 +303,10 @@ class QueueManager(object):
 
     for urn, request_data in sorted(requests.items()):
       request = rdfvalue.RequestState(request_data)
-      responses = []
-      for _, serialized, _ in response_data.get(urn, []):
-        responses.append(rdfvalue.GrrMessage(serialized))
-
+      responses = [
+          rdfvalue.GrrMessage(serialized)
+          for _, serialized, _ in response_data.get(urn, [])
+      ]
       yield (request, sorted(responses, key=lambda msg: msg.response_id))
 
     if len(requests) >= self.request_limit:
@@ -588,8 +588,7 @@ class QueueManager(object):
       notification.session_id = session_id
       notification.timestamp = ts
 
-      existing = notifications_by_session_id.get(notification.session_id)
-      if existing:
+      if existing := notifications_by_session_id.get(notification.session_id):
         # If we have a notification for this session_id already, we only store
         # the one that was scheduled last.
         if notification.first_queued > existing.first_queued:
@@ -654,11 +653,7 @@ class QueueManager(object):
       raise RuntimeError(
           "Can only delete notifications for rdfvalue.SessionIDs.")
 
-    if start is None:
-      start = 0
-    else:
-      start = int(start)
-
+    start = 0 if start is None else int(start)
     if end is None:
       end = self.frozen_timestamp or rdfvalue.RDFDatetime().Now()
 
@@ -719,16 +714,17 @@ class QueueManager(object):
     Returns:
         A list of GrrMessage() objects leased.
     """
-    user = ""
-    if self.token:
-      user = self.token.username
+    user = self.token.username if self.token else ""
     # Do the real work in a transaction
     try:
-      res = self.data_store.RetryWrapper(
-          queue, self._QueryAndOwn, lease_seconds=lease_seconds, limit=limit,
-          token=self.token, user=user)
-
-      return res
+      return self.data_store.RetryWrapper(
+          queue,
+          self._QueryAndOwn,
+          lease_seconds=lease_seconds,
+          limit=limit,
+          token=self.token,
+          user=user,
+      )
     except data_store.TransactionError:
       # This exception just means that we could not obtain the lock on the queue
       # so we just return an empty list, let the worker sleep and come back to
@@ -788,11 +784,10 @@ class WellKnownQueueManager(QueueManager):
   def DeleteWellKnownFlowResponses(self, session_id, responses):
     """Deletes given responses from the flow state queue."""
     subject = session_id.Add("state/request:00000000")
-    predicates = []
-    for response in responses:
-      predicates.append(QueueManager.FLOW_RESPONSE_TEMPLATE % (
-          response.request_id, response.response_id))
-
+    predicates = [
+        QueueManager.FLOW_RESPONSE_TEMPLATE %
+        (response.request_id, response.response_id) for response in responses
+    ]
     data_store.DB.DeleteAttributes(
         subject, predicates, sync=True, start=0, token=self.token)
 

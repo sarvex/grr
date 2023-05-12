@@ -82,7 +82,7 @@ class _WorkerThread(threading.Thread):
     """
     super(_WorkerThread, self).__init__()
     if pool.name:
-      self.name = pool.name + "-" + self.name
+      self.name = f"{pool.name}-{self.name}"
 
     self.pool = pool
     self._queue = queue
@@ -95,25 +95,20 @@ class _WorkerThread(threading.Thread):
 
     if self.pool.name:
       time_in_queue = time.time() - queueing_time
-      stats.STATS.RecordEvent(self.pool.name + "_queueing_time",
-                              time_in_queue)
+      stats.STATS.RecordEvent(f"{self.pool.name}_queueing_time", time_in_queue)
 
       start_time = time.time()
     try:
       target(*args)
-    # We can't let a worker die because one of the tasks it has to process
-    # throws an exception. Therefore, we catch every error that is
-    # raised in the call to target().
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:# pylint: disable=broad-except
       if self.pool.name:
-        stats.STATS.IncrementCounter(self.pool.name + "_task_exceptions")
+        stats.STATS.IncrementCounter(f"{self.pool.name}_task_exceptions")
       logging.exception("Caught exception in worker thread (%s): %s",
                         name, str(e))
 
     if self.pool.name:
       total_time = time.time() - start_time
-      stats.STATS.RecordEvent(self.pool.name + "_working_time",
-                              total_time)
+      stats.STATS.RecordEvent(f"{self.pool.name}_working_time", total_time)
 
   def _RemoveFromPool(self):
     """Remove ourselves from the pool.
@@ -257,20 +252,19 @@ class ThreadPool(object):
         raise DuplicateThreadpoolError(
             "A thread pool with the name %s already exists.", name)
 
-      stats.STATS.RegisterGaugeMetric(self.name + "_outstanding_tasks", int)
-      stats.STATS.SetGaugeCallback(self.name + "_outstanding_tasks",
+      stats.STATS.RegisterGaugeMetric(f"{self.name}_outstanding_tasks", int)
+      stats.STATS.SetGaugeCallback(f"{self.name}_outstanding_tasks",
                                    self._queue.qsize)
 
-      stats.STATS.RegisterGaugeMetric(self.name + "_threads", int)
-      stats.STATS.SetGaugeCallback(self.name + "_threads",
-                                   lambda: len(self))
+      stats.STATS.RegisterGaugeMetric(f"{self.name}_threads", int)
+      stats.STATS.SetGaugeCallback(f"{self.name}_threads", lambda: len(self))
 
-      stats.STATS.RegisterGaugeMetric(self.name + "_cpu_use", float)
-      stats.STATS.SetGaugeCallback(self.name + "_cpu_use", self.CPUUsage)
+      stats.STATS.RegisterGaugeMetric(f"{self.name}_cpu_use", float)
+      stats.STATS.SetGaugeCallback(f"{self.name}_cpu_use", self.CPUUsage)
 
-      stats.STATS.RegisterCounterMetric(self.name + "_task_exceptions")
-      stats.STATS.RegisterEventMetric(self.name + "_working_time")
-      stats.STATS.RegisterEventMetric(self.name + "_queueing_time")
+      stats.STATS.RegisterCounterMetric(f"{self.name}_task_exceptions")
+      stats.STATS.RegisterEventMetric(f"{self.name}_working_time")
+      stats.STATS.RegisterEventMetric(f"{self.name}_queueing_time")
 
   def __del__(self):
     if self.started:

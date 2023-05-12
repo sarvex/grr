@@ -52,26 +52,24 @@ def GetArtifactKnowledgeBase(client_obj, allow_uninitialized=False):
   if not allow_uninitialized:
     if not kb:
       raise artifact_lib.KnowledgeBaseUninitializedError(
-          "KnowledgeBase empty for %s." % client_obj.urn)
+          f"KnowledgeBase empty for {client_obj.urn}.")
     if not kb.os:
       raise artifact_lib.KnowledgeBaseAttributesMissingError(
-          "KnowledgeBase missing OS for %s. Knowledgebase content: %s" %
-          (client_obj.urn, kb))
+          f"KnowledgeBase missing OS for {client_obj.urn}. Knowledgebase content: {kb}"
+      )
   if not kb:
     kb = client_schema.KNOWLEDGE_BASE()
     SetCoreGRRKnowledgeBaseValues(kb, client_obj)
 
-  if kb.os == "Windows":
-    # Add fallback values.
-    if not kb.environ_allusersappdata and kb.environ_allusersprofile:
-      # Guess if we don't have it already.
-      if kb.os_major_version >= 6:
-        kb.environ_allusersappdata = u"c:\\programdata"
-        kb.environ_allusersprofile = u"c:\\programdata"
-      else:
-        kb.environ_allusersappdata = (u"c:\\documents and settings\\All Users\\"
-                                      "Application Data")
-        kb.environ_allusersprofile = u"c:\\documents and settings\\All Users"
+  if (kb.os == "Windows" and not kb.environ_allusersappdata
+      and kb.environ_allusersprofile):
+    if kb.os_major_version >= 6:
+      kb.environ_allusersappdata = u"c:\\programdata"
+      kb.environ_allusersprofile = u"c:\\programdata"
+    else:
+      kb.environ_allusersappdata = (u"c:\\documents and settings\\All Users\\"
+                                    "Application Data")
+      kb.environ_allusersprofile = u"c:\\documents and settings\\All Users"
 
   return kb
 
@@ -86,8 +84,7 @@ def SetCoreGRRKnowledgeBaseValues(kb, client_obj):
   if versions and versions.versions:
     kb.os_major_version = versions.versions[0]
     kb.os_minor_version = versions.versions[1]
-  client_os = client_obj.Get(client_schema.SYSTEM)
-  if client_os:
+  if client_os := client_obj.Get(client_schema.SYSTEM):
     kb.os = utils.SmartUnicode(client_obj.Get(client_schema.SYSTEM))
 
 
@@ -204,13 +201,12 @@ class CollectArtifactDependencies(flow.GRRFlow):
 
     # If we're not done but not collecting anything, start accepting the partial
     # dependencies as full, and see if we can complete.
-    if (self.state.awaiting_deps_artifacts and
-        not self.state.in_flight_artifacts):
-      if self.state.partial_fulfilled_deps:
-        partial = self.state.partial_fulfilled_deps.pop()
-        self.Log("Accepting partially fulfilled dependency: %s", partial)
-        self.state.fulfilled_deps.append(partial)
-        self._ScheduleCollection()
+    if (self.state.awaiting_deps_artifacts and not self.state.in_flight_artifacts
+        ) and self.state.partial_fulfilled_deps:
+      partial = self.state.partial_fulfilled_deps.pop()
+      self.Log("Accepting partially fulfilled dependency: %s", partial)
+      self.state.fulfilled_deps.append(partial)
+      self._ScheduleCollection()
 
   @flow.StateHandler(next_state="ProcessBase")
   def ProcessBase(self, responses):
@@ -222,55 +218,53 @@ class CollectArtifactDependencies(flow.GRRFlow):
     if not responses.success:
       self.Log("Failed to get artifact %s. Status: %s", artifact_name,
                responses.status)
+    elif deps := self.SetKBValue(responses.request_data["artifact_name"],
+                                 responses):
+      # If we fulfilled a dependency, make sure we have collected all
+      # artifacts that provide the dependency before marking it as fulfilled.
+      for dep in deps:
+        required_artifacts = artifact_lib.ArtifactRegistry.GetArtifactNames(
+            os_name=self.state.knowledge_base.os, provides=[dep])
+        if required_artifacts.issubset(self.state.completed_artifacts):
+          self.state.fulfilled_deps.append(dep)
+        else:
+          self.state.partial_fulfilled_deps.add(dep)
     else:
-      deps = self.SetKBValue(responses.request_data["artifact_name"],
-                             responses)
-      if deps:
-        # If we fulfilled a dependency, make sure we have collected all
-        # artifacts that provide the dependency before marking it as fulfilled.
-        for dep in deps:
-          required_artifacts = artifact_lib.ArtifactRegistry.GetArtifactNames(
-              os_name=self.state.knowledge_base.os, provides=[dep])
-          if required_artifacts.issubset(self.state.completed_artifacts):
-            self.state.fulfilled_deps.append(dep)
-          else:
-            self.state.partial_fulfilled_deps.add(dep)
-      else:
-        self.Log("Failed to get artifact %s. Artifact failed to return value.",
-                 artifact_name)
+      self.Log("Failed to get artifact %s. Artifact failed to return value.",
+               artifact_name)
 
     if self.state.awaiting_deps_artifacts:
       # Schedule any new artifacts for which we have now fulfilled dependencies.
       self._ScheduleCollection()
 
-      # If we fail to fulfil deps for things we're supposed to collect, raise
-      # an error.
-      if (self.state.awaiting_deps_artifacts and
-          not self.state.in_flight_artifacts):
-        missing_deps = list(self.state.all_deps.difference(
-            self.state.fulfilled_deps))
+    # If we fail to fulfil deps for things we're supposed to collect, raise
+    # an error.
+    if (self.state.awaiting_deps_artifacts and
+        not self.state.in_flight_artifacts):
+      missing_deps = list(self.state.all_deps.difference(
+          self.state.fulfilled_deps))
 
-        if self.args.require_complete:
-          raise flow.FlowError("KnowledgeBase initialization failed as the "
-                               "following artifacts had dependencies that could"
-                               " not be fulfilled %s. Missing: %s" %
-                               (self.state.awaiting_deps_artifacts,
-                                missing_deps))
-        else:
-          self.Log("Storing incomplete KnowledgeBase. The following artifacts"
-                   "had dependencies that could not be fulfilled %s. "
-                   "Missing: %s. Completed: %s" % (
-                       self.state.awaiting_deps_artifacts, missing_deps,
-                       self.state.completed_artifacts))
+      if self.args.require_complete:
+        raise flow.FlowError("KnowledgeBase initialization failed as the "
+                             "following artifacts had dependencies that could"
+                             " not be fulfilled %s. Missing: %s" %
+                             (self.state.awaiting_deps_artifacts,
+                              missing_deps))
+      else:
+        self.Log("Storing incomplete KnowledgeBase. The following artifacts"
+                 "had dependencies that could not be fulfilled %s. "
+                 "Missing: %s. Completed: %s" % (
+                     self.state.awaiting_deps_artifacts, missing_deps,
+                     self.state.completed_artifacts))
 
   def SetKBValue(self, artifact_name, responses):
     """Set values in the knowledge base based on responses."""
-    artifact_obj = artifact_lib.ArtifactRegistry.artifacts[artifact_name]
     if not responses:
       return None
 
     provided = set()   # Track which deps have been provided.
 
+    artifact_obj = artifact_lib.ArtifactRegistry.artifacts[artifact_name]
     for response in responses:
       if isinstance(response, rdfvalue.KnowledgeBaseUser):
         # MergeOrAddUser will update or add a user based on the attributes
@@ -288,21 +282,19 @@ class CollectArtifactDependencies(flow.GRRFlow):
           # Attempting to fulfil provides with a Dict response means we are
           # supporting multiple provides based on the keys of the dict.
           kb_dict = response.ToDict()
+        elif len(artifact_provides) == 1:
+          # If its not a dict we only support a single value.
+          kb_dict = {artifact_provides[0]: response}
         else:
-          if len(artifact_provides) == 1:
-            # If its not a dict we only support a single value.
-            kb_dict = {artifact_provides[0]: response}
-          else:
-            raise RuntimeError("Attempt to set a knowledge base value with "
-                               "multiple provides clauses without using Dict."
-                               ": %s" % artifact_obj)
+          raise RuntimeError(
+              f"Attempt to set a knowledge base value with multiple provides clauses without using Dict.: {artifact_obj}"
+          )
 
         for provides, value in kb_dict.iteritems():
           if provides not in artifact_provides:
-            raise RuntimeError("Attempt to provide knowledge base value %s "
-                               "without this being set in the artifact "
-                               "provides setting: %s" % (
-                                   provides, artifact_obj))
+            raise RuntimeError(
+                f"Attempt to provide knowledge base value {provides} without this being set in the artifact provides setting: {artifact_obj}"
+            )
 
           if isinstance(value, rdfvalue.RDFString):
             value = utils.SmartStr(value)
@@ -391,20 +383,19 @@ class KnowledgeBaseInitializationFlow(CollectArtifactDependencies):
     Raises:
       RuntimeError: On bad artifact configuration parameters.
     """
-    kb_base_set = set(config_lib.CONFIG["Artifacts.knowledge_base"])
     kb_add = set(config_lib.CONFIG["Artifacts.knowledge_base_additions"])
     kb_skip = set(config_lib.CONFIG["Artifacts.knowledge_base_skip"])
     if self.args.lightweight:
       kb_skip.update(
           config_lib.CONFIG["Artifacts.knowledge_base_heavyweight"])
+    kb_base_set = set(config_lib.CONFIG["Artifacts.knowledge_base"])
     kb_set = kb_base_set.union(kb_add) - kb_skip
 
     for artifact_name in kb_set:
       if artifact_name not in artifact_lib.ArtifactRegistry.artifacts:
-        raise RuntimeError("Attempt to specify unknown artifact %s in "
-                           "artifact configuration parameters. You may need"
-                           " to sync the artifact repo by running make in the"
-                           " artifacts directory." % artifact_name)
+        raise RuntimeError(
+            f"Attempt to specify unknown artifact {artifact_name} in artifact configuration parameters. You may need to sync the artifact repo by running make in the artifacts directory."
+        )
 
     no_deps_names = artifact_lib.ArtifactRegistry.GetArtifactNames(
         os_name=self.state.knowledge_base.os, name_list=kb_set,
@@ -446,15 +437,17 @@ def UploadArtifactYamlFile(file_content, base_urn=None, token=None,
     base_urn = aff4.ROOT_URN.Add("artifact_store")
 
   with aff4.FACTORY.Create(base_urn, aff4_type="RDFValueCollection",
-                           token=token, mode="rw") as artifact_coll:
+                             token=token, mode="rw") as artifact_coll:
 
     # Iterate through each artifact adding it to the collection.
     for artifact_value in artifact_lib.ArtifactsFromYaml(file_content):
       artifact_value.ValidateSyntax()
       artifact_coll.Add(artifact_value)
       artifact_lib.ArtifactRegistry.RegisterArtifact(
-          artifact_value, source="datastore:%s" % base_urn,
-          overwrite_if_exists=overwrite)
+          artifact_value,
+          source=f"datastore:{base_urn}",
+          overwrite_if_exists=overwrite,
+      )
       loaded_artifacts.append(artifact_value)
       logging.info("Uploaded artifact %s to %s", artifact_value.name, base_urn)
 
@@ -474,11 +467,13 @@ def LoadArtifactsFromDatastore(artifact_coll_urn=None, token=None,
     artifact_coll_urn = aff4.ROOT_URN.Add("artifact_store")
 
   with aff4.FACTORY.Create(artifact_coll_urn, aff4_type="RDFValueCollection",
-                           token=token, mode="rw") as artifact_coll:
+                             token=token, mode="rw") as artifact_coll:
     for artifact_value in artifact_coll:
       artifact_lib.ArtifactRegistry.RegisterArtifact(
-          artifact_value, source="datastore:%s" % artifact_coll_urn,
-          overwrite_if_exists=overwrite_if_exists)
+          artifact_value,
+          source=f"datastore:{artifact_coll_urn}",
+          overwrite_if_exists=overwrite_if_exists,
+      )
       loaded_artifacts.append(artifact_value)
       logging.debug("Loaded artifact %s from %s", artifact_value.name,
                     artifact_coll_urn)

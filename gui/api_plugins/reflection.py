@@ -92,12 +92,11 @@ class ApiRDFValueReflectionRenderer(api_call_renderers.ApiCallRenderer):
       rdfvalue_class = rdfvalue.RDFValue.classes[args.type]
       return self.RenderType(rdfvalue_class)
     else:
-      results = {}
-      for cls in rdfvalue.RDFValue.classes.values():
-        if aff4.issubclass(cls, rdfvalue.RDFValue):
-          results[cls.__name__] = self.RenderType(cls)
-
-      return results
+      return {
+          cls.__name__: self.RenderType(cls)
+          for cls in rdfvalue.RDFValue.classes.values()
+          if aff4.issubclass(cls, rdfvalue.RDFValue)
+      }
 
 
 class ApiAllRDFValuesReflectionRenderer(ApiRDFValueReflectionRenderer):

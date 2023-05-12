@@ -60,13 +60,13 @@ class ClientIndex(keyword_index.AFF4KeywordIndex):
         keyword_string = self._NormalizeKeyword(utils.SmartStr(keyword))
         keywords.append(keyword_string)
         if prefix:
-          keywords.append(prefix + ":" + keyword_string)
+          keywords.append(f"{prefix}:{keyword_string}")
 
     def TryAppendPrefixes(prefix, keyword, delimiter):
       TryAppend(prefix, keyword)
       segments = str(keyword).split(delimiter)
       for i in range(1, len(segments)):
-        TryAppend(prefix, delimiter.join(segments[0:i]))
+        TryAppend(prefix, delimiter.join(segments[:i]))
       return len(segments)
 
     def TryAppendIP(ip):

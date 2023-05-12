@@ -68,12 +68,7 @@ def MakeStatResponse(st, pathspec):
   """Creates a StatResponse proto."""
   response = rdfvalue.StatEntry(pathspec=pathspec)
 
-  if st is None:
-    # Special case empty stat if we don't have a real value, e.g. we get Access
-    # denied when stating a file. We still want to give back a value so we let
-    # the defaults from the proto pass through.
-    pass
-  else:
+  if st is not None:
     # Now fill in the stat value
     for attr in ["st_mode",
                  "st_ino",
@@ -147,10 +142,9 @@ class File(vfs.VFSHandler):
     try:
       if not self.files:
         # Note that the encoding of local path is system specific
-        local_path = client_utils.CanonicalPathToLocalPath(self.path + "/")
+        local_path = client_utils.CanonicalPathToLocalPath(f"{self.path}/")
         self.files = [utils.SmartUnicode(entry) for entry in
                       os.listdir(local_path)]
-    # Some filesystems do not support unicode properly
     except UnicodeEncodeError as e:
       raise IOError(str(e))
     except (IOError, OSError) as e:
@@ -264,19 +258,18 @@ class File(vfs.VFSHandler):
   def ListFiles(self):
     """List all files in the dir."""
     if not self.IsDirectory():
-      raise IOError("%s is not a directory." % self.path)
+      raise IOError(f"{self.path} is not a directory.")
 
-    else:
-      for path in self.files:
-        try:
-          response = self.Stat(utils.JoinPath(self.path, path))
-          pathspec = self.pathspec.Copy()
-          pathspec.last.path = utils.JoinPath(pathspec.last.path, path)
-          response.pathspec = pathspec
+    for path in self.files:
+      try:
+        response = self.Stat(utils.JoinPath(self.path, path))
+        pathspec = self.pathspec.Copy()
+        pathspec.last.path = utils.JoinPath(pathspec.last.path, path)
+        response.pathspec = pathspec
 
-          yield response
-        except OSError:
-          pass
+        yield response
+      except OSError:
+        pass
 
   def IsDirectory(self):
     return self.size is None

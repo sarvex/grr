@@ -20,8 +20,9 @@ class MockAction(actions.ActionPlugin):
   out_rdfvalue = rdfvalue.LogMessage
 
   def Run(self, message):
-    self.SendReply(rdfvalue.EchoRequest(
-        data="Received Message: %s. Data %s" % (message.data, "x" * 100)))
+    self.SendReply(
+        rdfvalue.EchoRequest(
+            data=f'Received Message: {message.data}. Data {"x" * 100}'))
 
 
 class RaiseAction(actions.ActionPlugin):
@@ -145,9 +146,7 @@ class BasicContextTests(test_lib.GRRBaseTest):
       queue.Put("B", 1)
       queue.Put("C", 2)
 
-    result = []
-    for item in queue.Get():
-      result.append(item)
+    result = list(queue.Get())
     self.assertEqual(result, ["C"] * 10 + ["A", "B"] * 10)
 
     # Tests a partial Get().
@@ -169,8 +168,7 @@ class BasicContextTests(test_lib.GRRBaseTest):
       queue.Put("B", 1)
       queue.Put("C", 2)
 
-    for item in queue.Get():
-      result.append(item)
+    result.extend(iter(queue.Get()))
     self.assertEqual(result, ["C"] * 10 + ["A", "B"] * 10)
 
 

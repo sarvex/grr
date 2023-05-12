@@ -48,7 +48,7 @@ class ApiHuntsListRendererTest(test_lib.GRRBaseTest):
 
     result = self.renderer.Render(rdfvalue.ApiHuntsListRendererArgs(),
                                   token=self.token)
-    descriptions = set(r["summary"]["description"] for r in result["items"])
+    descriptions = {r["summary"]["description"] for r in result["items"]}
 
     self.assertEqual(len(descriptions), 10)
     for i in range(10):
@@ -113,8 +113,11 @@ class ApiHuntSummaryRendererRegressionTest(
           "the hunt", token=self.token) as hunt_obj:
         hunt_urn = hunt_obj.urn
 
-    self.Check("GET", "/api/hunts/" + hunt_urn.Basename(),
-               replace={hunt_urn.Basename(): "H:123456"})
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_urn.Basename()}",
+        replace={hunt_urn.Basename(): "H:123456"},
+    )
 
 
 class ApiHuntLogRendererRegressionTest(
@@ -133,13 +136,21 @@ class ApiHuntLogRendererRegressionTest(
         with test_lib.FakeTime(55):
           hunt_obj.Log("Sample message: bar.")
 
-    self.Check("GET", "/api/hunts/%s/log" % hunt_obj.urn.Basename(),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
-    self.Check("GET", "/api/hunts/%s/log?count=1" % hunt_obj.urn.Basename(),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
-    self.Check("GET", ("/api/hunts/%s/log?offset=1&count=1" %
-                       hunt_obj.urn.Basename()),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/log",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/log?count=1",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/log?offset=1&count=1",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
 
 
 class ApiHuntErrorsRendererRegressionTest(
@@ -160,13 +171,21 @@ class ApiHuntErrorsRendererRegressionTest(
           hunt_obj.LogClientError(rdfvalue.ClientURN("C.1111222233334444"),
                                   "Error bar.", "<some backtrace>")
 
-    self.Check("GET", "/api/hunts/%s/errors" % hunt_obj.urn.Basename(),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
-    self.Check("GET", "/api/hunts/%s/errors?count=1" % hunt_obj.urn.Basename(),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
-    self.Check("GET", ("/api/hunts/%s/errors?offset=1&count=1" %
-                       hunt_obj.urn.Basename()),
-               replace={hunt_obj.urn.Basename(): "H:123456"})
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/errors",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/errors?count=1",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
+    self.Check(
+        "GET",
+        f"/api/hunts/{hunt_obj.urn.Basename()}/errors?offset=1&count=1",
+        replace={hunt_obj.urn.Basename(): "H:123456"},
+    )
 
 
 def main(argv):

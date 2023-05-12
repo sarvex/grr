@@ -21,8 +21,7 @@ class UnauthorizedRenderer(renderers.TemplateRenderer):
   def Layout(self, request, response, exception=None):
     subject = message = ""
 
-    exception = exception or request.REQ.get("e", "")
-    if exception:
+    if exception := exception or request.REQ.get("e", ""):
       subject = str(exception.subject)
       message = str(exception)
 
@@ -452,8 +451,8 @@ Authorization request ({{this.reason|escape}}) failed:
       self.show_keepalive_option = True
     else:
       raise RuntimeError(
-          "Unexpected namespace for access check: %s (subject=%s)." %
-          (namespace, self.subject))
+          f"Unexpected namespace for access check: {namespace} (subject={self.subject})."
+      )
 
     response = super(CheckAccess, self).Layout(request, response)
     if not self.silent:

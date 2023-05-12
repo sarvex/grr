@@ -44,15 +44,14 @@ class VFSDirectory(aff4.AFF4Volume):
     client_id = self.urn.Split()[0]
 
     if attribute == "CONTAINS":
-      # Get the pathspec for this object
-      flow_id = flow.GRRFlow.StartFlow(client_id=client_id,
-                                       flow_name="ListDirectory",
-                                       pathspec=self.real_pathspec,
-                                       priority=priority,
-                                       notify_to_user=False,
-                                       token=self.token)
-
-      return flow_id
+      return flow.GRRFlow.StartFlow(
+          client_id=client_id,
+          flow_name="ListDirectory",
+          pathspec=self.real_pathspec,
+          priority=priority,
+          notify_to_user=False,
+          token=self.token,
+      )
 
   class SchemaCls(aff4.AFF4Volume.SchemaCls):
     """Attributes specific to VFSDirectory."""
@@ -148,7 +147,7 @@ class BlobImage(aff4.AFF4Image):
         self.chunk_cache.Put(readahead[fd.urn], fd)
 
     if result is None:
-      raise IOError("Chunk '%s' not found for reading!" % chunk)
+      raise IOError(f"Chunk '{chunk}' not found for reading!")
 
     return result
 
@@ -376,14 +375,12 @@ class AFF4SparseImage(BlobImage):
 
   def _GetChunkForReading(self, chunk):
     """Retrieve the relevant blob from the AFF4 data store or cache."""
-    result = None
     offset = chunk * self._HASH_SIZE
     self.index.seek(offset)
     chunk_name = self.index.read(self._HASH_SIZE)
+    result = None
     try:
-      result = self.chunk_cache.Get(chunk_name)
-      # Cache hit, so we're done.
-      return result
+      return self.chunk_cache.Get(chunk_name)
     except KeyError:
       # Read ahead a few chunks.
       self.index.seek(offset)
@@ -418,9 +415,8 @@ class AFF4SparseImage(BlobImage):
         self.chunk_cache.Put(readahead[fd.urn], fd)
 
       if result is None:
-        raise aff4.ChunkNotFoundError("Chunk '%s' (urn: %s) not "
-                                      "found for reading!"
-                                      % (chunk, chunk_name))
+        raise aff4.ChunkNotFoundError(
+            f"Chunk '{chunk}' (urn: {chunk_name}) not found for reading!")
 
     return result
 
@@ -620,8 +616,7 @@ class AFF4Index(aff4.AFF4Object):
     """
     if not isinstance(urn, rdfvalue.RDFURN):
       raise RuntimeError("Bad urn parameter for index addition.")
-    column_name = "index:%s:%s:%s" % (
-        attribute.predicate, value.lower(), urn)
+    column_name = f"index:{attribute.predicate}:{value.lower()}:{urn}"
     self.to_set.add(column_name)
 
   def Query(self, attributes, regex, limit=100):
@@ -639,22 +634,22 @@ class AFF4Index(aff4.AFF4Object):
     # Make the regular expressions.
     regex = regex.lstrip("^")   # Begin and end string matches work because
     regex = regex.rstrip("$")   # they are explicit in the storage.
-    regexes = ["index:%s:%s:.*" % (a.predicate, regex.lower())
-               for a in attributes]
+    regexes = [f"index:{a.predicate}:{regex.lower()}:.*" for a in attributes]
     start = 0
     try:
       start, length = limit  # pylint: disable=unpacking-non-sequence
     except TypeError:
       length = limit
 
-    # Get all the hits
-    index_hits = set()
-    for col, _, _ in data_store.DB.ResolveRegex(
-        self.urn, regexes, token=self.token,
-        timestamp=data_store.DB.ALL_TIMESTAMPS):
-      # Extract URN from the column_name.
-      index_hits.add(rdfvalue.RDFURN(col.rsplit("aff4:/", 1)[1]))
-
+    index_hits = {
+        rdfvalue.RDFURN(col.rsplit("aff4:/", 1)[1])
+        for col, _, _ in data_store.DB.ResolveRegex(
+            self.urn,
+            regexes,
+            token=self.token,
+            timestamp=data_store.DB.ALL_TIMESTAMPS,
+        )
+    }
     hits = []
     for i, hit in enumerate(index_hits):
       if i < start: continue
@@ -666,9 +661,13 @@ class AFF4Index(aff4.AFF4Object):
     return hits
 
   def _QueryRaw(self, regex):
-    return set([(x, y) for (y, x, _) in data_store.DB.ResolveRegex(
-        self.urn, regex, token=self.token,
-        timestamp=data_store.DB.ALL_TIMESTAMPS)])
+    return {(x, y)
+            for (y, x, _) in data_store.DB.ResolveRegex(
+                self.urn,
+                regex,
+                token=self.token,
+                timestamp=data_store.DB.ALL_TIMESTAMPS,
+            )}
 
   def MultiQuery(self, attributes, regexes):
     """Query the index for the attribute, matching multiple regexes at a time.
@@ -679,14 +678,12 @@ class AFF4Index(aff4.AFF4Object):
     Returns:
       A dict mapping each matched attribute name to a list of RDFURNs.
     """
-    # Make the regular expressions.
-    combined_regexes = []
     # Begin and end string matches work because they are explicit in storage.
     regexes = [r.lstrip("^").rstrip("$").lower() for r in regexes]
-    for attribute in attributes:
-      combined_regexes.append("index:%s:(%s):.*" % (
-          attribute.predicate, "|".join(regexes)))
-
+    combined_regexes = [
+        f'index:{attribute.predicate}:({"|".join(regexes)}):.*'
+        for attribute in attributes
+    ]
     # Get all the hits
     result = {}
     for col, _, _ in data_store.DB.ResolveRegex(
@@ -704,8 +701,7 @@ class AFF4Index(aff4.AFF4Object):
     """Remove all entries for a given attribute referring to a specific urn."""
     if not isinstance(urn, rdfvalue.RDFURN):
       raise RuntimeError("Bad urn parameter for index deletion.")
-    column_name = "index:%s:%s:%s" % (
-        attribute.predicate, value.lower(), urn)
+    column_name = f"index:{attribute.predicate}:{value.lower()}:{urn}"
     self.to_delete.add(column_name)
 
 
@@ -823,8 +819,7 @@ class AFF4LabelsIndex(aff4.AFF4Volume):
     results = []
     index_results = self.used_labels_index.ListValues()
     for name in index_results:
-      label = self.LabelForIndexName(name)
-      if label:
+      if label := self.LabelForIndexName(name):
         if owner and label.owner != owner:
           continue
         results.append(label)
@@ -835,44 +830,33 @@ class AFF4LabelsIndex(aff4.AFF4Volume):
 
   def FindUrnsByLabel(self, label, owner=None):
     results = self.MultiFindUrnsByLabel([label], owner=owner).values()
-    if not results:
-      return []
-    else:
-      return results[0]
+    return [] if not results else results[0]
 
   def MultiFindUrnsByLabel(self, labels, owner=None):
-    if owner is None:
-      owner = ".+"
-    else:
-      owner = re.escape(owner)
-
+    owner = ".+" if owner is None else re.escape(owner)
     query_results = self.urns_index.MultiQuery(
         [aff4.AFF4Object.SchemaCls.LABELS],
         [owner + self.ESCAPED_SEPARATOR + re.escape(label) for label in labels])
 
-    results = {}
-    for key, value in query_results.iteritems():
-      results[self.LabelForIndexName(key)] = value
-    return results
+    return {
+        self.LabelForIndexName(key): value
+        for key, value in query_results.iteritems()
+    }
 
   def FindUrnsByLabelNameRegex(self, label_name_regex, owner=None):
     return self.MultiFindUrnsByLabelNameRegex([label_name_regex], owner=owner)
 
   def MultiFindUrnsByLabelNameRegex(self, label_name_regexes, owner=None):
-    if owner is None:
-      owner = ".+"
-    else:
-      owner = re.escape(owner)
-
+    owner = ".+" if owner is None else re.escape(owner)
     query_results = self.urns_index.MultiQuery(
         [aff4.AFF4Object.SchemaCls.LABELS],
         [owner + self.ESCAPED_SEPARATOR + regex
          for regex in label_name_regexes])
 
-    results = {}
-    for key, value in query_results.iteritems():
-      results[self.LabelForIndexName(key)] = value
-    return results
+    return {
+        self.LabelForIndexName(key): value
+        for key, value in query_results.iteritems()
+    }
 
   def CleanUpUsedLabelsIndex(self):
     raise NotImplementedError()

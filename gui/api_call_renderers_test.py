@@ -57,9 +57,7 @@ class SampleGetRendererWithAdditionalArgs(api_call_renderers.ApiCallRenderer):
     }
 
     if args.additional_args:
-      rendered_additional_args = []
-      for arg in args.additional_args:
-        rendered_additional_args.append(str(arg))
+      rendered_additional_args = [str(arg) for arg in args.additional_args]
       result["additional_args"] = rendered_additional_args
 
     return result

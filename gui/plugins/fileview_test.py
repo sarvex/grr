@@ -177,7 +177,7 @@ class TestFileView(FileViewTestBase):
     self.Click("css=#_fs-os-proc-10 a")
     self.Click("css=span[type=subject]:contains(\"cmdline\")")
     target_aff4_path = "aff4:/C.0000000000000001/fs/os/proc/10/cmdline"
-    self.Click("css=[state-aff4_path='%s'] > li > #HexView" % target_aff4_path)
+    self.Click(f"css=[state-aff4_path='{target_aff4_path}'] > li > #HexView")
 
     for i, value in enumerate(
         "6c 73 00 68 65 6c 6c 6f 20 77 6f 72 6c 64 27 00 2d 6c".split(" ")):
@@ -502,7 +502,7 @@ class TestHostInformation(FileViewTestBase):
   def testClickingOnPlusOpensHistoricalAttributes(self):
     """Test the fileview interface."""
 
-    self.Open("/#c=" + self.client_id)
+    self.Open(f"/#c={self.client_id}")
     self.WaitUntil(self.IsTextPresent, "VFSGRRClient")
 
     # We removed all the users, so no 'Steve O'Bryan' should be visible.

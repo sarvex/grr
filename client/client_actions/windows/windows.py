@@ -43,7 +43,7 @@ def UnicodeFromCodePage(string):
   # get the current code page
   codepage = ctypes.windll.kernel32.GetOEMCP()
   try:
-    return string.decode("cp%s" % codepage)
+    return string.decode(f"cp{codepage}")
   except UnicodeError:
     try:
       return string.decode("utf16", "ignore")
@@ -179,8 +179,7 @@ class EnumerateUsers(actions.ActionPlugin):
       # This query determines if the sid corresponds to a real user account.
       for result in RunWMIQuery("SELECT * FROM Win32_UserAccount "
                                 "WHERE name=\"%s\"" % user):
-        response = self.GetWMIAccount(result, sid, homedir, known_sids)
-        if response:
+        if response := self.GetWMIAccount(result, sid, homedir, known_sids):
           self.SendReply(**response)
 
 
@@ -195,14 +194,15 @@ class EnumerateInterfaces(actions.ActionPlugin):
   def RunNetAdapterWMIQuery(self):
     pythoncom.CoInitialize()
     for interface in wmi.WMI().Win32_NetworkAdapterConfiguration(IPEnabled=1):
-      addresses = []
-      for ip_address in interface.IPAddress:
-        addresses.append(rdfvalue.NetworkAddress(
-            human_readable_address=ip_address))
-
-      args = {"ifname": interface.Description}
-      args["mac_address"] = binascii.unhexlify(
-          interface.MACAddress.replace(":", ""))
+      addresses = [
+          rdfvalue.NetworkAddress(human_readable_address=ip_address)
+          for ip_address in interface.IPAddress
+      ]
+      args = {
+          "ifname": interface.Description,
+          "mac_address":
+          binascii.unhexlify(interface.MACAddress.replace(":", "")),
+      }
       if addresses:
         args["addresses"] = addresses
 
@@ -227,9 +227,12 @@ class EnumerateFilesystems(actions.ActionPlugin):
               drive).rstrip("\\")
 
           label, _, _, _, fs_type = win32api.GetVolumeInformation(drive)
-          self.SendReply(device=volume,
-                         mount_point="/%s:/" % drive[0],
-                         type=fs_type, label=UnicodeFromCodePage(label))
+          self.SendReply(
+              device=volume,
+              mount_point=f"/{drive[0]}:/",
+              type=fs_type,
+              label=UnicodeFromCodePage(label),
+          )
         except win32api.error:
           pass
 
@@ -417,7 +420,7 @@ class UninstallDriver(actions.ActionPlugin):
         if os.path.exists(driver_path):
           os.remove(driver_path)
       except (OSError, IOError) as e:
-        raise OSError("Driver deletion failed: " + str(e))
+        raise OSError(f"Driver deletion failed: {str(e)}")
 
   def Run(self, args):
     """Unloads a driver."""

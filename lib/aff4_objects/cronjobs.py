@@ -43,8 +43,9 @@ class CreateCronJobFlowArgs(rdfvalue.RDFProtoStruct):
     if self.flow_runner_args.flow_name:
       flow_cls = flow.GRRFlow.classes.get(self.flow_runner_args.flow_name)
       if flow_cls is None:
-        raise ValueError("Flow '%s' not known by this implementation." %
-                         self.flow_runner_args.flow_name)
+        raise ValueError(
+            f"Flow '{self.flow_runner_args.flow_name}' not known by this implementation."
+        )
 
       # The required protobuf for this class is in args_type.
       return flow_cls.args_type
@@ -75,7 +76,7 @@ class CronManager(object):
     """
     if not job_name:
       uid = utils.PRNG.GetUShort()
-      job_name = "%s_%s" % (cron_args.flow_runner_args.flow_name, uid)
+      job_name = f"{cron_args.flow_runner_args.flow_name}_{uid}"
 
     cron_job_urn = self.CRON_JOBS_PATH.Add(job_name)
     cron_job = aff4.FACTORY.Create(cron_job_urn, aff4_type="CronJob", mode="rw",
@@ -232,7 +233,7 @@ def ScheduleSystemCronFlows(token=None):
     try:
       cls = flow.GRRFlow.classes[name]
     except KeyError:
-      raise KeyError("No such flow: %s." % name)
+      raise KeyError(f"No such flow: {name}.")
 
     if not aff4.issubclass(cls, SystemCronFlow):
       raise ValueError("Enabled system cron job name doesn't correspond to "
@@ -364,8 +365,7 @@ class CronJob(aff4.AFF4Volume):
 
   def IsRunning(self):
     """Returns True if there's a currently running iteration of this job."""
-    current_urn = self.Get(self.Schema.CURRENT_FLOW_URN)
-    if current_urn:
+    if current_urn := self.Get(self.Schema.CURRENT_FLOW_URN):
       try:
         current_flow = aff4.FACTORY.Open(urn=current_urn, aff4_type="GRRFlow",
                                          token=self.token, mode="r")
@@ -411,8 +411,7 @@ class CronJob(aff4.AFF4Volume):
     return False
 
   def StopCurrentRun(self, reason="Cron lifetime exceeded.", force=True):
-    current_flow_urn = self.Get(self.Schema.CURRENT_FLOW_URN)
-    if current_flow_urn:
+    if current_flow_urn := self.Get(self.Schema.CURRENT_FLOW_URN):
       flow.GRRFlow.TerminateFlow(current_flow_urn, reason=reason, force=force,
                                  token=self.token)
       self.Set(self.Schema.LAST_RUN_STATUS,
@@ -461,9 +460,7 @@ class CronJob(aff4.AFF4Volume):
     if self.KillOldFlows():
       return
 
-    # If currently running flow has finished, update our state.
-    current_flow_urn = self.Get(self.Schema.CURRENT_FLOW_URN)
-    if current_flow_urn:
+    if current_flow_urn := self.Get(self.Schema.CURRENT_FLOW_URN):
       current_flow = aff4.FACTORY.Open(current_flow_urn, token=self.token)
       runner = current_flow.GetRunner()
       if not runner.IsRunning():

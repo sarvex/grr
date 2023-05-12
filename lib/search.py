@@ -19,7 +19,6 @@ INDEX_PREFIX_MAP = {"host": CLIENT_SCHEMA.HOSTNAME,
 def SearchClients(query_string, start=0, max_results=1000, token=None):
   """Take a query string and interpret it as a search, returning ClientURNs."""
   query_string = query_string.strip()
-  mac_addr_re = r"^([0-9a-f]{2}[:-]){5}([0-9a-f]{2})$"
   result_iterators = []
 
   try:
@@ -50,8 +49,9 @@ def SearchClients(query_string, start=0, max_results=1000, token=None):
         prefix = ""
       if prefix:
         if prefix not in INDEX_PREFIX_MAP:
-          raise IOError("Invalid prefix %s. Choose from %s" % (
-              prefix, INDEX_PREFIX_MAP.keys()))
+          raise IOError(
+              f"Invalid prefix {prefix}. Choose from {INDEX_PREFIX_MAP.keys()}"
+          )
 
         query_string = query_string.split(":", 1)[1]
 
@@ -65,9 +65,8 @@ def SearchClients(query_string, start=0, max_results=1000, token=None):
       indexed_attrs = [a for a in client_schema().ListAttributes() if a.index]
       indexed_attrs.append(client_schema.LABELS)
 
-    # Fixup MAC addresses to match the MAC index format.
-    match = re.search(mac_addr_re, query_string)
-    if match:
+    mac_addr_re = r"^([0-9a-f]{2}[:-]){5}([0-9a-f]{2})$"
+    if match := re.search(mac_addr_re, query_string):
       query_string = query_string.replace(":", "").replace("-", "")
 
     # Get the main results using wildcard matches.
@@ -75,9 +74,9 @@ def SearchClients(query_string, start=0, max_results=1000, token=None):
       # If matching start or end of string, handle that explicitly.
       wildcard_query = query_string
       if not wildcard_query.startswith("^"):
-        wildcard_query = ".*%s" % wildcard_query
+        wildcard_query = f".*{wildcard_query}"
       if not wildcard_query.endswith("$"):
-        wildcard_query = "%s.*" % wildcard_query
+        wildcard_query = f"{wildcard_query}.*"
       search_results = index.Query(
           indexed_attrs, wildcard_query, limit=(start, max_results))
       search_results = [rdfvalue.ClientURN(r) for r in search_results]
@@ -119,8 +118,8 @@ def GetClientURNsForHostnames(hostnames, token=None):
                               mode="rw", token=token)
   hostname = aff4.AFF4Object.classes["VFSGRRClient"].SchemaCls.HOSTNAME
   fqdn = aff4.AFF4Object.classes["VFSGRRClient"].SchemaCls.FQDN
-  result = {}
   query_result = index.MultiQuery([hostname, fqdn], hostnames)
-  for hostname, urns in query_result.iteritems():
-    result[hostname] = [rdfvalue.ClientURN(urn) for urn in urns]
-  return result
+  return {
+      hostname: [rdfvalue.ClientURN(urn) for urn in urns]
+      for hostname, urns in query_result.iteritems()
+  }

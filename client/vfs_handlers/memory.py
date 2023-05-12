@@ -41,14 +41,13 @@ class MemoryVFS(vfs.VFSHandler):
   @classmethod
   def Open(cls, fd, component, pathspec=None, progress_callback=None):
     _ = pathspec
-    return cls(fd, pathspec=component, progress_callback=progress_callback)
+    return cls(fd, _=component, progress_callback=progress_callback)
 
   def IsDirectory(self):
     return False
 
   def Stat(self):
-    result = rdfvalue.StatEntry(st_size=self.size, pathspec=self.pathspec)
-    return result
+    return rdfvalue.StatEntry(st_size=self.size, pathspec=self.pathspec)
 
   def Read(self, length):
     """Read from the memory device, null padding the ranges."""
@@ -113,10 +112,9 @@ class LinuxMemory(MemoryVFS):
     runs = []
     for line in open("/proc/iomem"):
       if "System RAM" in line:
-        m = re.match("([^-]+)-([^ ]+)", line)
-        if m:
-          start = int(m.group(1), 16)
-          end = int(m.group(2), 16)
+        if m := re.match("([^-]+)-([^ ]+)", line):
+          start = int(m[1], 16)
+          end = int(m[2], 16)
           runs.append((start, end - start))
 
     return sorted(runs)
@@ -322,7 +320,7 @@ class OSXMemory(MemoryVFS):
       List of tuples (start_address, length of segment in bytes)
     """
     num_descriptors = size / desc_size
-    result = list()
+    result = []
 
     for x in xrange(num_descriptors):
       (seg_type, _, start, _, pages, _) = struct.unpack_from(

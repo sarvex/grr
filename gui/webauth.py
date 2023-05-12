@@ -65,8 +65,7 @@ class BasicWebAuthManager(BaseWebAuthManager):
         user, password = authorization.decode("base64").split(":", 1)
         token = rdfvalue.ACLToken(username=user)
 
-        fd = aff4.FACTORY.Open("aff4:/users/%s" % user, aff4_type="GRRUser",
-                               token=token)
+        fd = aff4.FACTORY.Open(f"aff4:/users/{user}", aff4_type="GRRUser", token=token)
         crypted_password = fd.Get(fd.Schema.PASSWORD)
         if crypted_password and crypted_password.CheckPassword(password):
           authorized = True
@@ -82,9 +81,7 @@ class BasicWebAuthManager(BaseWebAuthManager):
       result["WWW-Authenticate"] = "Basic realm='Secure Area'"
       return result
 
-    # Modify this to implement additional checking (e.g. enforce SSL).
-    response = func(request, *args, **kwargs)
-    return response
+    return func(request, *args, **kwargs)
 
 
 class NullWebAuthManager(BaseWebAuthManager):

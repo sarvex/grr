@@ -61,12 +61,12 @@ class DecodeError(InitializeError, ValueError):
 class RDFValueMetaclass(registry.MetaclassRegistry):
   """A metaclass for managing semantic values."""
 
-  def __init__(cls, name, bases, env_dict):  # pylint: disable=no-self-argument
-    super(RDFValueMetaclass, cls).__init__(name, bases, env_dict)
+  def __init__(self, name, bases, env_dict):  # pylint: disable=no-self-argument
+    super(RDFValueMetaclass, self).__init__(name, bases, env_dict)
 
     # Run and clear any late binding callbacks registered for this class.
     for callback, kwargs in _LATE_BINDING_STORE.pop(name, []):
-      callback(target=cls, **kwargs)
+      callback(target=self, **kwargs)
 
 
 class RDFValue(object):
@@ -233,7 +233,7 @@ class RDFString(RDFBytes):
   @staticmethod
   def Startswith(attribute, filter_implemention, string):
     return filter_implemention.PredicateContainsFilter(
-        attribute, "^" + utils.EscapeRegex(string))
+        attribute, f"^{utils.EscapeRegex(string)}")
 
   operators = RDFValue.operators.copy()
   operators["matches"] = (1, "ContainsMatch")
@@ -415,8 +415,8 @@ class RDFDatetime(RDFInteger):
           self.ParseFromHumanReadable(initializer)
 
     elif initializer is not None:
-      raise InitializeError("Unknown initializer for RDFDateTime: %s." %
-                            type(initializer))
+      raise InitializeError(
+          f"Unknown initializer for RDFDateTime: {type(initializer)}.")
 
   def Now(self):
     self._value = int(time.time() * self.converter)
@@ -579,8 +579,8 @@ class Duration(RDFInteger):
     elif initializer is None:
       self._value = 0
     else:
-      raise InitializeError("Unknown initializer for Duration: %s." %
-                            type(initializer))
+      raise InitializeError(
+          f"Unknown initializer for Duration: {type(initializer)}.")
 
   def Validate(self, value, **_):
     self.ParseFromString(value)
@@ -648,11 +648,7 @@ class Duration(RDFInteger):
     return NotImplemented
 
   def Expiry(self, base_time=None):
-    if base_time is None:
-      base_time = RDFDatetime().Now()
-    else:
-      base_time = base_time.Copy()
-
+    base_time = RDFDatetime().Now() if base_time is None else base_time.Copy()
     base_time_sec = base_time.AsSecondsFromEpoch()
 
     return base_time.FromSecondsFromEpoch(base_time_sec + self._value)
@@ -670,22 +666,20 @@ class Duration(RDFInteger):
 
     multiplicator = 1
 
-    if timestring[-1].isdigit():
-      pass
-    else:
+    if not timestring[-1].isdigit():
       try:
         multiplicator = self.DIVIDERS[timestring[-1]]
       except KeyError:
-        raise RuntimeError("Invalid duration multiplicator: '%s' ('%s')." %
-                           (timestring[-1], orig_string))
+        raise RuntimeError(
+            f"Invalid duration multiplicator: '{timestring[-1]}' ('{orig_string}')."
+        )
 
       timestring = timestring[:-1]
 
     try:
       self._value = int(timestring) * multiplicator
     except ValueError:
-      raise InitializeError("Could not parse expiration time '%s'." %
-                            orig_string)
+      raise InitializeError(f"Could not parse expiration time '{orig_string}'.")
 
 
 class ByteSize(RDFInteger):
@@ -722,8 +716,8 @@ class ByteSize(RDFInteger):
     elif initializer is None:
       self._value = 0
     else:
-      raise InitializeError("Unknown initializer for ByteSize: %s." %
-                            type(initializer))
+      raise InitializeError(
+          f"Unknown initializer for ByteSize: {type(initializer)}.")
 
   def __str__(self):
     size_token = ""
@@ -737,7 +731,7 @@ class ByteSize(RDFInteger):
       size_token = "Kb"
       value = float(self._value) / 1024
     else:
-      return utils.SmartStr(self._value) + "b"
+      return f"{utils.SmartStr(self._value)}b"
 
     return "%.1f%s" % (value, size_token)
 
@@ -755,19 +749,15 @@ class ByteSize(RDFInteger):
 
     match = self.REGEX.match(string.strip().lower())
     if not match:
-      raise DecodeError("Unknown specification for ByteSize %s" % string)
+      raise DecodeError(f"Unknown specification for ByteSize {string}")
 
     multiplier = self.DIVIDERS.get(match.group(2))
     if not multiplier:
-      raise DecodeError("Invalid multiplier %s" % match.group(2))
+      raise DecodeError(f"Invalid multiplier {match.group(2)}")
 
     # The value may be represented as a float, but if not dont lose accuracy.
     value = match.group(1)
-    if "." in value:
-      value = float(value)
-    else:
-      value = long(value)
-
+    value = float(value) if "." in value else long(value)
     self._value = int(value * multiplier)
 
 
@@ -813,7 +803,7 @@ class RDFURN(RDFValue):
     # TODO(user): This is another ugly hack but we need to support legacy
     # clients that still send plain strings in their responses.
     if self.bare_string_re.match(initializer):
-      initializer = "aff4:/" + initializer
+      initializer = f"aff4:/{initializer}"
 
     self._urn = urlparse.urlparse(initializer, scheme="aff4")
 
@@ -823,7 +813,7 @@ class RDFURN(RDFValue):
     # own parsing...
     if self._urn.query:
       scheme = self._urn.scheme
-      url = "%s?%s" % (self._urn.path, self._urn.query)
+      url = f"{self._urn.path}?{self._urn.query}"
       netloc, params, query, fragment = "", "", "", ""
       self._urn = urlparse.ParseResult(
           scheme, netloc, url, params, query, fragment)
@@ -933,15 +923,13 @@ class RDFURN(RDFValue):
     Returns:
       A list of path components of this URN.
     """
-    if count:
-      result = filter(None, self.Path().split("/", count))
-      while len(result) < count:
-        result.append("")
-
-      return result
-
-    else:
+    if not count:
       return filter(None, self.Path().split("/"))
+    result = filter(None, self.Path().split("/", count))
+    while len(result) < count:
+      result.append("")
+
+    return result
 
   def RelativeName(self, volume):
     """Given a volume URN return the relative URN as a unicode string.
@@ -971,7 +959,7 @@ class RDFURN(RDFValue):
     return hash(self._string_urn)
 
   def __repr__(self):
-    return "<%s age=%s>" % (str(self), self.age)
+    return f"<{str(self)} age={self.age}>"
 
 
 class Subject(RDFURN):
@@ -984,7 +972,7 @@ class Subject(RDFURN):
   @staticmethod
   def Startswith(unused_attribute, filter_implemention, string):
     return filter_implemention.SubjectContainsFilter(
-        "^" + utils.EscapeRegex(string))
+        f"^{utils.EscapeRegex(string)}")
 
   @staticmethod
   def HasAttribute(unused_attribute, filter_implemention, string):
@@ -1023,10 +1011,10 @@ class SessionID(RDFURN):
       if isinstance(flow_name, int):
         initializer = RDFURN(base).Add("%s:%X" % (queue.Basename(), flow_name))
       else:
-        initializer = RDFURN(base).Add("%s:%s" % (queue.Basename(), flow_name))
+        initializer = RDFURN(base).Add(f"{queue.Basename()}:{flow_name}")
     elif isinstance(initializer, RDFURN):
       if initializer.Basename().count(":") != 1:
-        raise InitializeError("Invalid URN for SessionID: %s" % initializer)
+        raise InitializeError(f"Invalid URN for SessionID: {initializer}")
     super(SessionID, self).__init__(initializer=initializer, age=age)
 
   def Queue(self):
@@ -1048,5 +1036,5 @@ class FlowSessionID(SessionID):
   def ParseFromString(self, initializer=None):
     # Old clients sometimes send bare well known flow ids.
     if not utils.SmartStr(initializer).startswith("aff4"):
-      initializer = "aff4:/flows/" + initializer
+      initializer = f"aff4:/flows/{initializer}"
     super(FlowSessionID, self).ParseFromString(initializer)

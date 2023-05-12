@@ -22,7 +22,8 @@ class AFF4Benchmark(test_lib.AverageMicroBenchmarks):
       fd.Close()
 
     for object_type in ["AFF4Object", "HashImage", "AFF4MemoryStream"]:
-      self.TimeIt(CreateAFF4Object, name="Create %s" % object_type,
+      self.TimeIt(CreateAFF4Object,
+                  name=f"Create {object_type}",
                   object_type=object_type)
 
     self.TimeIt(CreateAFF4Object, name="Create VFSGRRClient",

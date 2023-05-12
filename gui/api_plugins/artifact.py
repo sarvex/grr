@@ -21,11 +21,11 @@ class ApiArtifactRenderer(api_call_renderers.ApiCallRenderer):
     # Convert artifacts into a dict usable from javascript.
     artifact_dict = {}
     for artifact_name, artifact_val in artifacts.items():
-      processors = []
-      for processor in parsers.Parser.GetClassesByArtifact(artifact_name):
-        processors.append({"name": processor.__name__,
-                           "output_types": processor.output_types,
-                           "doc": processor.GetDescription()})
+      processors = [{
+          "name": processor.__name__,
+          "output_types": processor.output_types,
+          "doc": processor.GetDescription(),
+      } for processor in parsers.Parser.GetClassesByArtifact(artifact_name)]
       is_custom = artifact_name in custom_artifacts
       artifact_dict[artifact_name] = {"artifact": artifact_val.ToExtendedDict(),
                                       "processors": processors,
@@ -45,17 +45,10 @@ class ApiArtifactRenderer(api_call_renderers.ApiCallRenderer):
     except IOError:
       collection = {}
 
-    custom_artifacts = set()
-    for value in collection:
-      custom_artifacts.add(value.name)
-
-    # Get all artifacts that aren't Bootstrap and aren't the base class.
-    artifacts = {}
+    custom_artifacts = {value.name for value in collection}
     artifact.LoadArtifactsFromDatastore(token=token)
 
-    for name, artifact_val in artifact_lib.ArtifactRegistry.artifacts.items():
-      artifacts[name] = artifact_val
-
+    artifacts = dict(artifact_lib.ArtifactRegistry.artifacts.items())
     return self.RenderArtifacts(artifacts, custom_artifacts=custom_artifacts)
 
 

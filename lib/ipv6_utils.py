@@ -17,13 +17,12 @@ BAD_SINGLE_COLON = re.compile(r"(^\:[^:].*|.*[^:]\:$)")
 def _RemoveV4Ending(addr_string):
   """Replace v4 endings with v6 equivalents."""
 
-  match = V4_ENDING.match(addr_string)
-  if match:
+  if match := V4_ENDING.match(addr_string):
     ipv4_addr = ".".join(match.groups()[1:])
     try:
       socket.inet_aton(ipv4_addr)
     except socket.error:
-      raise socket.error("Illegal IPv4 extension: %s" % addr_string)
+      raise socket.error(f"Illegal IPv4 extension: {addr_string}")
 
     if int(match.group(2)) == 0:
       raise socket.error("IPv4 can't start with 0")
@@ -39,9 +38,7 @@ def _StripLeadingOrTrailingDoubleColons(addr_string):
 
   if addr_string.startswith("::"):
     return addr_string[1:]
-  if addr_string.endswith("::"):
-    return addr_string[:-1]
-  return addr_string
+  return addr_string[:-1] if addr_string.endswith("::") else addr_string
 
 
 def _ZeroPad(addr_string):
@@ -49,8 +46,7 @@ def _ZeroPad(addr_string):
   chunks = addr_string.split(":")
   total_length = len(chunks)
   if total_length > 8:
-    raise socket.error("Too many address chunks in %s, expected 8" %
-                       addr_string)
+    raise socket.error(f"Too many address chunks in {addr_string}, expected 8")
 
   double_colon = False
   addr_array = []
@@ -58,21 +54,20 @@ def _ZeroPad(addr_string):
     if chunk:
       chunk_len = len(chunk)
       if chunk_len > 4:
-        raise socket.error("Chunk must be length 4: %s" % addr_string)
+        raise socket.error(f"Chunk must be length 4: {addr_string}")
       if chunk_len != 4:
         # Pad out with 0's until we have 4 digits
         chunk = "0" * (4 - chunk_len) + chunk
       addr_array.append(chunk)
     else:
       if double_colon:
-        raise socket.error("More than one double colon in %s" % addr_string)
-      else:
-        double_colon = True
-        # Add zeros for the compressed chunks
-        addr_array.extend(["0000"] * (8 - total_length + 1))
+        raise socket.error(f"More than one double colon in {addr_string}")
+      double_colon = True
+      # Add zeros for the compressed chunks
+      addr_array.extend(["0000"] * (8 - total_length + 1))
 
   if len(addr_array) != 8:
-    raise socket.error("Bad address length, expected 8 chunks: %s" % addr_array)
+    raise socket.error(f"Bad address length, expected 8 chunks: {addr_array}")
 
   return "".join(addr_array)
 
@@ -103,7 +98,7 @@ def InetAtoN(addr_string):
   try:
     return addr_string.decode("hex_codec")
   except TypeError:
-    raise socket.error("Error decoding: %s" % addr_string)
+    raise socket.error(f"Error decoding: {addr_string}")
 
 
 def InetNtoA(packed_bytes):
@@ -118,18 +113,19 @@ def InetNtoA(packed_bytes):
   """
 
   if len(packed_bytes) != 16:
-    raise socket.error("IPv6 addresses are 16 bytes long, got %s for %s" %
-                       (len(packed_bytes), packed_bytes))
+    raise socket.error(
+        f"IPv6 addresses are 16 bytes long, got {len(packed_bytes)} for {packed_bytes}"
+    )
 
   hex_encoded = packed_bytes.encode("hex_codec")
 
   # Detect IPv4 endings
   if hex_encoded.startswith("00000000000000000000ffff"):
-    return "::ffff:" + socket.inet_ntoa(packed_bytes[-4:])
+    return f"::ffff:{socket.inet_ntoa(packed_bytes[-4:])}"
 
   # Detect IPv4 endings. If the first quad is 0, it isn't IPv4.
   if hex_encoded.startswith("0" * 24) and not hex_encoded.startswith("0" * 28):
-    return "::" + socket.inet_ntoa(packed_bytes[-4:])
+    return f"::{socket.inet_ntoa(packed_bytes[-4:])}"
 
   # Split into quads
   chunked = [hex_encoded[i:i + 4] for i in xrange(0, len(hex_encoded), 4)]
@@ -145,10 +141,7 @@ def InetNtoA(packed_bytes):
 
   result_str = ":".join(output)
 
-  # Compress with :: by finding longest sequence of zeros that look like :0:0:0
-  # or 0:0:0 if its the start of the string
-  matches = ZERO_SEQUENCE.findall(result_str)
-  if matches:
+  if matches := ZERO_SEQUENCE.findall(result_str):
     largest_zero_str = max(matches, key=len)
 
     if len(largest_zero_str) > 3:

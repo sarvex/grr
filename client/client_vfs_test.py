@@ -32,11 +32,7 @@ class VFSTest(test_lib.GRRBaseTest):
 
   def GetNumbers(self):
     """Generate a test string."""
-    result = ""
-    for i in range(1, 1001):
-      result += "%s\n" % i
-
-    return result
+    return "".join("%s\n" % i for i in range(1, 1001))
 
   def TestFileHandling(self, fd):
     """Test the file like object behaviour."""
@@ -45,7 +41,7 @@ class VFSTest(test_lib.GRRBaseTest):
     self.assertEqual(fd.size, len(original_string))
 
     fd.Seek(0)
-    self.assertEqual(fd.Read(100), original_string[0:100])
+    self.assertEqual(fd.Read(100), original_string[:100])
     self.assertEqual(fd.Tell(), 100)
 
     fd.Seek(-10, 1)
@@ -145,8 +141,8 @@ class VFSTest(test_lib.GRRBaseTest):
     read_path = fd.pathspec.Basename()
 
     # The exact file now is non deterministic but should be either of the two:
-    if read_path != "numbers.txt" and read_path != "numbers.TXT":
-      raise RuntimeError("read path is %s" % read_path)
+    if read_path not in ["numbers.txt", "numbers.TXT"]:
+      raise RuntimeError(f"read path is {read_path}")
 
     # Ensure that the produced pathspec specified no case folding:
     s = fd.Stat()

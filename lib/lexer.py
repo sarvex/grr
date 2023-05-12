@@ -132,7 +132,7 @@ class Lexer(object):
 
     # Check that we are making progress - if we are too full, we assume we are
     # stuck.
-    self.Error("Lexer stuck at state %s" % (self.state))
+    self.Error(f"Lexer stuck at state {self.state}")
     self.processed_buffer += self.buffer[:1]
     self.buffer = self.buffer[1:]
     return "Error"
@@ -193,9 +193,8 @@ class SelfFeederMixIn(Lexer):
   def NextToken(self, end=True):
     # If we dont have enough data - feed ourselves: We assume
     # that we must have at least one sector in our buffer.
-    if len(self.buffer) < 512:
-      if self.Feed() == 0 and not self.buffer:
-        return None
+    if len(self.buffer) < 512 and self.Feed() == 0 and not self.buffer:
+      return None
 
     return Lexer.next_token(self, end)
 
@@ -246,16 +245,15 @@ class Expression(object):
     return False
 
   def __str__(self):
-    return "Expression: (%s) (%s) %s" % (
-        self.attribute, self.operator, self.args)
+    return f"Expression: ({self.attribute}) ({self.operator}) {self.args}"
 
   def PrintTree(self, depth=""):
-    return "%s %s" % (depth, self)
+    return f"{depth} {self}"
 
   def Compile(self, filter_implemention):
     """Given a filter implementation, compile this expression."""
-    raise NotImplementedError("%s does not implement Compile." %
-                              self.__class__.__name__)
+    raise NotImplementedError(
+        f"{self.__class__.__name__} does not implement Compile.")
 
 
 class BinaryExpression(Expression):
@@ -268,33 +266,30 @@ class BinaryExpression(Expression):
     super(BinaryExpression, self).__init__()
 
   def __str__(self):
-    return "Binary Expression: %s %s" % (
-        self.operator, [str(x) for x in self.args])
+    return f"Binary Expression: {self.operator} {[str(x) for x in self.args]}"
 
   def AddOperands(self, lhs, rhs):
-    if isinstance(lhs, Expression) and isinstance(rhs, Expression):
-      self.args.insert(0, lhs)
-      self.args.append(rhs)
-    else:
-      raise ParseError("Expected expression, got %s %s %s" % (
-          lhs, self.operator, rhs))
+    if not isinstance(lhs, Expression) or not isinstance(rhs, Expression):
+      raise ParseError(f"Expected expression, got {lhs} {self.operator} {rhs}")
+    self.args.insert(0, lhs)
+    self.args.append(rhs)
 
   def PrintTree(self, depth=""):
     result = "%s%s\n" % (depth, self.operator)
     for part in self.args:
-      result += "%s-%s\n" % (depth, part.PrintTree(depth + "  "))
+      result += "%s-%s\n" % (depth, part.PrintTree(f"{depth}  "))
 
     return result
 
   def Compile(self, filter_implemention):
     """Compile the binary expression into a filter object."""
     operator = self.operator.lower()
-    if operator == "and" or operator == "&&":
+    if operator in ["and", "&&"]:
       method = "AndFilter"
-    elif operator == "or" or operator == "||":
+    elif operator in ["or", "||"]:
       method = "OrFilter"
     else:
-      raise ParseError("Invalid binary operator %s" % operator)
+      raise ParseError(f"Invalid binary operator {operator}")
 
     args = [x.Compile(filter_implemention) for x in self.args]
     return getattr(filter_implemention, method)(*args)
@@ -407,7 +402,7 @@ class SearchParser(Lexer):
     try:
       self.current_expression.SetAttribute(string)
     except AttributeError:
-      raise ParseError("Invalid attribute '%s'" % string)
+      raise ParseError(f"Invalid attribute '{string}'")
 
     return "OPERATOR"
 
@@ -474,9 +469,9 @@ class SearchParser(Lexer):
     return self.stack[0]
 
   def Error(self, message=None, weight=1):
-    raise ParseError(u"%s in position %s: %s <----> %s )" % (
-        utils.SmartUnicode(message), len(self.processed_buffer),
-        self.processed_buffer, self.buffer))
+    raise ParseError(
+        f"{utils.SmartUnicode(message)} in position {len(self.processed_buffer)}: {self.processed_buffer} <----> {self.buffer} )"
+    )
 
   def Parse(self):
     if not self.filter_string:

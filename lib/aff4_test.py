@@ -206,7 +206,7 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
 
     # Add a bunch of attributes now.
     for i in range(5):
-      obj.AddAttribute(obj.Schema.STORED("http://example.com/%s" % i))
+      obj.AddAttribute(obj.Schema.STORED(f"http://example.com/{i}"))
 
     # There should be 6 there now
     self.assertEqual(6, len(list(obj.GetValuesForAttribute(obj.Schema.STORED))))
@@ -239,7 +239,7 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
 
     # Add a bunch of attributes now.
     for i in range(5):
-      obj.AddAttribute(obj.Schema.STORED("http://example.com/%s" % i))
+      obj.AddAttribute(obj.Schema.STORED(f"http://example.com/{i}"))
 
     # There should be 5 unsynced versions now
     self.assertEqual(5, len(obj.new_attributes[obj.Schema.STORED.predicate]))
@@ -260,7 +260,7 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
     obj = aff4.FACTORY.Create("foobar", "AFF4Object", token=self.token)
     # Add a bunch of attributes now.
     for i in range(5):
-      obj.AddAttribute(obj.Schema.STORED("http://example.com/%s" % i))
+      obj.AddAttribute(obj.Schema.STORED(f"http://example.com/{i}"))
     obj.Close()
 
     obj = aff4.FACTORY.Open("foobar", mode="r", token=self.token,
@@ -621,13 +621,11 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
                                  token=self.token)
     client.Close()
 
-    # Start some new flows on it
-    session_ids = []
-    for _ in range(10):
-      session_ids.append(
-          flow.GRRFlow.StartFlow(client_id=self.client_id,
-                                 flow_name="FlowOrderTest", token=self.token))
-
+    session_ids = [
+        flow.GRRFlow.StartFlow(client_id=self.client_id,
+                               flow_name="FlowOrderTest",
+                               token=self.token) for _ in range(10)
+    ]
     # Try to open a single flow.
     flow_obj = aff4.FACTORY.Open(session_ids[0], mode="r", token=self.token)
 
@@ -689,11 +687,13 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
     self.assertEqual(child.Get(child.Schema.TYPE), "VFSFile")
 
     # This tests filtering through the AFF4Filter.
-    fd = aff4.FACTORY.Open(rdfvalue.ClientURN(client_id).Add(
-        "/fs/os/c/bin %s" % client_id), token=self.token)
+    fd = aff4.FACTORY.Open(
+        rdfvalue.ClientURN(client_id).Add(f"/fs/os/c/bin {client_id}"),
+        token=self.token,
+    )
 
-    matched = list(fd.Query(
-        "subject matches '%s/r?bash'" % utils.EscapeRegex(fd.urn)))
+    matched = list(
+        fd.Query(f"subject matches '{utils.EscapeRegex(fd.urn)}/r?bash'"))
     self.assertEqual(len(matched), 2)
 
     matched.sort(key=lambda x: str(x.urn))
@@ -1229,13 +1229,14 @@ class AFF4Tests(test_lib.AFF4ObjectTest):
 
     label_index = aff4.FACTORY.Open(aff4.VFSGRRClient.labels_index_urn,
                                     token=self.token)
-    self.assertSetEqual(set(label_index.ListUsedLabels()),
-                        set([rdfvalue.AFF4ObjectLabel(name="label1",
-                                                      owner="test"),
-                             rdfvalue.AFF4ObjectLabel(name="label2",
-                                                      owner="test"),
-                             rdfvalue.AFF4ObjectLabel(name="label3",
-                                                      owner="test")]))
+    self.assertSetEqual(
+        set(label_index.ListUsedLabels()),
+        {
+            rdfvalue.AFF4ObjectLabel(name="label1", owner="test"),
+            rdfvalue.AFF4ObjectLabel(name="label2", owner="test"),
+            rdfvalue.AFF4ObjectLabel(name="label3", owner="test"),
+        },
+    )
 
     found_urns = label_index.MultiFindUrnsByLabel(labels)
     self.assertListEqual(found_urns[rdfvalue.AFF4ObjectLabel(name="label1",
@@ -1299,7 +1300,7 @@ class AFF4SymlinkTestSubject(aff4.AFF4Volume):
     self.test_var = 42
 
   def testMethod(self):
-    return str(self.Get(self.Schema.SOME_STRING)) + "-suffix"
+    return f"{str(self.Get(self.Schema.SOME_STRING))}-suffix"
 
 
 class AFF4SymlinkTest(test_lib.AFF4ObjectTest):
@@ -1348,7 +1349,7 @@ class AFF4SymlinkTest(test_lib.AFF4ObjectTest):
       elif fd.urn == fd_urn1:
         self.assertTrue(isinstance(fd, AFF4SymlinkTestSubject))
       else:
-        raise ValueError("Unexpected URN: %s" % fd.urn)
+        raise ValueError(f"Unexpected URN: {fd.urn}")
 
   def testOpenedSymlinkAFF4AttributesAreEqualToTarget(self):
     fd, symlink_obj = self.CreateAndOpenObjectAndSymlink()
@@ -1553,10 +1554,13 @@ class ForemanTests(test_lib.AFF4ObjectTest):
     with test_lib.FakeTime(1000):
       foreman = aff4.FACTORY.Open("aff4:/foreman", mode="rw", token=self.token)
 
-      rules = []
-      rules.append(rdfvalue.ForemanRule(created=1000 * 1000000,
-                                        expires=1500 * 1000000,
-                                        description="Test rule1"))
+      rules = [
+          rdfvalue.ForemanRule(
+              created=1000 * 1000000,
+              expires=1500 * 1000000,
+              description="Test rule1",
+          )
+      ]
       rules.append(rdfvalue.ForemanRule(created=1000 * 1000000,
                                         expires=1200 * 1000000,
                                         description="Test rule2"))

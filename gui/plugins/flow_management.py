@@ -197,13 +197,12 @@ Prototype: {{ this.prototype|escape }}
       except AttributeError:
         pass
 
-    # Now fill in information about each arg to this flow.
-    prototypes = []
-    for type_descriptor in flow_class.args_type.type_infos:
-      if not type_descriptor.hidden:
-        prototypes.append("%s" % (type_descriptor.name))
-
-    self.prototype = "%s(%s)" % (flow_class.__name__, ", ".join(prototypes))
+    prototypes = [
+        f"{type_descriptor.name}"
+        for type_descriptor in flow_class.args_type.type_infos
+        if not type_descriptor.hidden
+    ]
+    self.prototype = f'{flow_class.__name__}({", ".join(prototypes)})'
 
     self.flow_doc = flow_class.__doc__
 
@@ -379,8 +378,7 @@ class FlowLogView(renderers.AngularDirectiveRenderer):
   directive = "grr-flow-log"
 
   def Layout(self, request, response):
-    self.directive_args = {}
-    self.directive_args["flow-urn"] = request.REQ.get("flow")
+    self.directive_args = {"flow-urn": request.REQ.get("flow")}
     return super(FlowLogView, self).Layout(request, response)
 
 
@@ -416,8 +414,7 @@ class FlowTabView(renderers.TabLayout):
     if req_flow:
       self.state["flow"] = req_flow
 
-    client_id = request.REQ.get("client_id")
-    if client_id:
+    if client_id := request.REQ.get("client_id"):
       self.state["client_id"] = client_id
 
     if req_flow and not self.IsOutputExportable(req_flow, token=request.token):
@@ -626,11 +623,11 @@ class ListFlowsTable(renderers.TableRenderer):
 
     flow_urn = self.state.get("value", request.REQ.get("value"))
     if flow_urn is None:
-      client_id = request.REQ.get("client_id")
-      if not client_id: return
+      if client_id := request.REQ.get("client_id"):
+        flow_urn = rdfvalue.ClientURN(client_id).Add("flows")
 
-      flow_urn = rdfvalue.ClientURN(client_id).Add("flows")
-
+      else:
+        return
     flow_root = aff4.FACTORY.Open(flow_urn, mode="r", token=request.token)
     root_children_paths = sorted(flow_root.ListChildren(),
                                  key=lambda x: x.age, reverse=True)
@@ -650,14 +647,9 @@ class ListFlowsTable(renderers.TableRenderer):
 
     row_index = start_row
     for flow_obj in root_children:
-      if level2_children.get(flow_obj.urn, None):
-        row_type = "branch"
-      else:
-        row_type = "leaf"
-
+      row_type = "branch" if level2_children.get(flow_obj.urn, None) else "leaf"
       row = {}
-      last = flow_obj.Get(flow_obj.Schema.LAST)
-      if last:
+      if last := flow_obj.Get(flow_obj.Schema.LAST):
         row["Last Active"] = last
 
       if isinstance(flow_obj, aff4.AFF4Object.GRRFlow):
@@ -860,7 +852,7 @@ class ProgressGraphRenderer(renderers.ImageDownloadRenderer):
     plot_lib.plt.clf()
 
     plot_lib.plt.plot(x, y)
-    plot_lib.plt.title("Progress for flow %s" % flow_id)
+    plot_lib.plt.title(f"Progress for flow {flow_id}")
     plot_lib.plt.xlabel("Time (s)")
     plot_lib.plt.ylabel("Bytes downloaded")
     plot_lib.plt.grid(True)

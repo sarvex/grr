@@ -47,12 +47,13 @@ class ApiGRRHuntRenderer(
     if args.with_full_summary:
       all_clients_count, completed_clients_count, _ = hunt.GetClientsCounts()
 
-      untyped_summary_part.update(dict(
+      untyped_summary_part |= dict(
           stats=context.usage_stats,
           all_clients_count=all_clients_count,
           completed_clients_count=completed_clients_count,
-          outstanding_clients_count=(
-              all_clients_count - completed_clients_count)))
+          outstanding_clients_count=(all_clients_count -
+                                     completed_clients_count),
+      )
 
       typed_summary_part = dict(
           regex_rules=runner.args.regex_rules or [],
@@ -67,11 +68,10 @@ class ApiGRRHuntRenderer(
       typed_summary_part[k] = api_value_renderers.RenderValue(
           v, with_types=True, with_metadata=True, limit_lists=10)
 
-    rendered_object = {
-        "summary": dict(untyped_summary_part.items() +
-                        typed_summary_part.items())
-        }
-    return rendered_object
+    return {
+        "summary":
+        dict(untyped_summary_part.items() + typed_summary_part.items())
+    }
 
 
 class ApiHuntsListRendererArgs(rdfvalue.RDFProtoStruct):
@@ -105,13 +105,10 @@ class ApiHuntsListRenderer(api_call_renderers.ApiCallRenderer):
     else:
       children = children[args.offset:]
 
-    hunt_list = []
-    for hunt in fd.OpenChildren(children=children):
-      if not isinstance(hunt, hunts.GRRHunt) or not hunt.state:
-        continue
-
-      hunt_list.append(hunt)
-
+    hunt_list = [
+        hunt for hunt in fd.OpenChildren(children=children)
+        if isinstance(hunt, hunts.GRRHunt) and hunt.state
+    ]
     return dict(total_count=len(children),
                 offset=args.offset,
                 count=len(hunt_list),

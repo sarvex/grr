@@ -158,12 +158,12 @@ class OutputPluginWithOutputStreams(OutputPlugin):
     Returns:
       Dictionary with "stream name" -> "stream urn" key value pairs.
     """
-    return dict((k, v.urn) for k, v in self.state.output_streams.items())
+    return {k: v.urn for k, v in self.state.output_streams.items()}
 
   @property
   def reverse_output_streams_map(self):
     """Mapping of output streams urns into names."""
-    return dict((v.urn, k) for k, v in self.state.output_streams.items())
+    return {v.urn: k for k, v in self.state.output_streams.items()}
 
   def OpenOutputStreams(self):
     """Opens all the used output streams.
@@ -175,12 +175,8 @@ class OutputPluginWithOutputStreams(OutputPlugin):
                                           aff4_type="AFF4UnversionedImage",
                                           token=self.token))
 
-    result = {}
     reverse_map = self.reverse_output_streams_map
-    for stream in streams:
-      result[reverse_map[stream.urn]] = stream
-
-    return result
+    return {reverse_map[stream.urn]: stream for stream in streams}
 
   def WriteSnapshotZipStream(self, fd, compression=zipfile.ZIP_DEFLATED):
     """Writes available output streams to a new zipped stream."""
@@ -196,12 +192,11 @@ class OutputPluginDescriptor(rdfvalue.RDFProtoStruct):
     if self.plugin_name:
       plugin_cls = OutputPlugin.classes.get(self.plugin_name)
       if plugin_cls is None:
-        raise KeyError("Unknown output plugin %s" % self.plugin_name)
+        raise KeyError(f"Unknown output plugin {self.plugin_name}")
       return plugin_cls
 
   def GetPluginArgsClass(self):
-    plugin_cls = self.GetPluginClass()
-    if plugin_cls:
+    if plugin_cls := self.GetPluginClass():
       return plugin_cls.args_type
 
   def GetPluginForState(self, plugin_state):
@@ -211,5 +206,5 @@ class OutputPluginDescriptor(rdfvalue.RDFProtoStruct):
   def __str__(self):
     result = self.plugin_name
     if self.plugin_args:
-      result += " <%s>" % utils.SmartStr(self.plugin_args)
+      result += f" <{utils.SmartStr(self.plugin_args)}>"
     return result

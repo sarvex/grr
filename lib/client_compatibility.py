@@ -36,6 +36,6 @@ class ClientCompatibility(flow.EventListener):
       fd = aff4.FACTORY.Open(hack_urn, token=self.token)
       python_blob = fd.Get(fd.Schema.BINARY)
       if python_blob is None:
-        raise flow.FlowError("Python hack %s not found." % hack_urn)
+        raise flow.FlowError(f"Python hack {hack_urn} not found.")
 
       self.CallClient(client_id, "ExecutePython", python_code=python_blob)

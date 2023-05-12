@@ -122,7 +122,7 @@ class KernelObjectPatcher(object):
       return new_modinfo
 
     logging.info("Rewritten modinfo section is too big.")
-    info_strings -= set(["vermagic", "srcversion", "depends"])
+    info_strings -= {"vermagic", "srcversion", "depends"}
     try:
       to_remove = info_strings.pop()
     except KeyError:
@@ -139,18 +139,18 @@ class KernelObjectPatcher(object):
     needed_versions = set(needed_versions)
     found_versions = {}
 
-    driver_path = "/lib/modules/%s/kernel/drivers" % platform.uname()[2]
+    driver_path = f"/lib/modules/{platform.uname()[2]}/kernel/drivers"
     num_files = 0
     for (directory, _, files) in os.walk(driver_path):
       for filename in files:
         if filename[-3:] == ".ko":
           try:
-            fd = open("%s/%s" % (directory, filename), "rb")
+            fd = open(f"{directory}/{filename}", "rb")
             num_files += 1
             data = fd.read()
             sections = self.GetSectionOffsets(data)
             versions = self.GetImportedVersions(data, sections)
-            found_versions.update(versions)
+            found_versions |= versions
             if set(found_versions.keys()) >= needed_versions:
               logging.info("All imports found, gathered data from %d modules.",
                            num_files)
@@ -159,7 +159,7 @@ class KernelObjectPatcher(object):
             pass
 
     missing = needed_versions - set(found_versions.keys())
-    msg = "Imports %s could not be found." % ",".join(missing)
+    msg = f'Imports {",".join(missing)} could not be found.'
     logging.info(msg)
     raise RuntimeError(msg)
 

@@ -178,14 +178,14 @@ class FlowRunner(object):
           token=self.token)
 
   def _GetLogsCollectionURN(self, logs_collection_urn):
-    if self.parent_runner is not None and not logs_collection_urn:
+    if self.parent_runner is None or logs_collection_urn:
+      # If we weren't passed a collection urn, create one in our namespace.
+      return logs_collection_urn or self.flow_obj.urn.Add("Logs")
+    else:
       # We are a child runner, we should have been passed a
       # logs_collection_urn
       raise RuntimeError("Flow: %s has a parent %s but no logs_collection_urn"
                          " set." % (self.flow_obj.urn, self.parent_runner))
-
-    # If we weren't passed a collection urn, create one in our namespace.
-    return logs_collection_urn or self.flow_obj.urn.Add("Logs")
 
   def OpenLogsCollection(self, logs_collection_urn, mode="w"):
     """Open the parent-flow logs collection for writing or create a new one.
@@ -231,8 +231,7 @@ class FlowRunner(object):
         plugin.Initialize()
         output_plugins_states.append((plugin_descriptor, plugin.state))
       except Exception as e:  # pylint: disable=broad-except
-        self.Log("Plugin %s failed to initialize (%s), ignoring it." %
-                 (plugin, e))
+        self.Log(f"Plugin {plugin} failed to initialize ({e}), ignoring it.")
 
     context = utils.DataObject(
         args=args,
@@ -346,20 +345,18 @@ class FlowRunner(object):
 
     # Send all the messages
     for i, payload in enumerate(messages):
-      if isinstance(payload, rdfvalue.RDFValue):
-        msg = rdfvalue.GrrMessage(
-            session_id=self.session_id, request_id=request_state.id,
-            response_id=1 + i,
-            auth_state=rdfvalue.GrrMessage.AuthorizationState.AUTHENTICATED,
-            payload=payload,
-            type=rdfvalue.GrrMessage.Type.MESSAGE)
+      if not isinstance(payload, rdfvalue.RDFValue):
+        raise FlowRunnerError(f"Bad message {payload} of type {type(payload)}.")
 
-        if isinstance(payload, rdfvalue.GrrStatus):
-          msg.type = rdfvalue.GrrMessage.Type.STATUS
-      else:
-        raise FlowRunnerError("Bad message %s of type %s." % (payload,
-                                                              type(payload)))
+      msg = rdfvalue.GrrMessage(
+          session_id=self.session_id, request_id=request_state.id,
+          response_id=1 + i,
+          auth_state=rdfvalue.GrrMessage.AuthorizationState.AUTHENTICATED,
+          payload=payload,
+          type=rdfvalue.GrrMessage.Type.MESSAGE)
 
+      if isinstance(payload, rdfvalue.GrrStatus):
+        msg.type = rdfvalue.GrrMessage.Type.STATUS
       self.QueueResponse(msg, start_time)
 
     # Notify the worker about it.
@@ -443,15 +440,12 @@ class FlowRunner(object):
               self.ReQueueRequest(request)
             break
 
-          # If we get here its all good - run the flow.
-          if self.IsRunning():
-            self.flow_obj.HeartBeat()
-            self._Process(request, responses, thread_pool=thread_pool,
-                          events=processing)
-
-          # Quit early if we are no longer alive.
-          else:
+          if not self.IsRunning():
             break
+
+          self.flow_obj.HeartBeat()
+          self._Process(request, responses, thread_pool=thread_pool,
+                        events=processing)
 
           # At this point we have processed this request - we can remove it and
           # its responses from the queue.
@@ -460,10 +454,9 @@ class FlowRunner(object):
           self.DecrementOutstandingRequests()
 
         # Are there any more outstanding requests?
-        if not self.OutstandingRequests():
-          # Allow the flow to cleanup
-          if self.IsRunning() and self.context.current_state != "End":
-            self.RunStateMethod("End")
+        if (not self.OutstandingRequests() and self.IsRunning()
+            and self.context.current_state != "End"):
+          self.RunStateMethod("End")
 
         # Rechecking the OutstandingRequests allows the End state (which was
         # called above) to issue further client requests - hence postpone
@@ -540,8 +533,9 @@ class FlowRunner(object):
       try:
         method = getattr(self.flow_obj, method)
       except AttributeError:
-        raise FlowRunnerError("Flow %s has no state method %s" % (
-            self.flow_obj.__class__.__name__, method))
+        raise FlowRunnerError(
+            f"Flow {self.flow_obj.__class__.__name__} has no state method {method}"
+        )
 
       method(direct_response=direct_response,
              request=request,
@@ -551,8 +545,6 @@ class FlowRunner(object):
         self.ProcessRepliesWithOutputPlugins(self.sent_replies)
         self.sent_replies = []
 
-    # We don't know here what exceptions can be thrown in the flow but we have
-    # to continue. Thus, we catch everything.
     except Exception:  # pylint: disable=broad-except
       # This flow will terminate now
 
@@ -628,21 +620,17 @@ class FlowRunner(object):
     try:
       action = actions.ActionPlugin.classes[action_name]
     except KeyError:
-      raise RuntimeError("Client action %s not found." % action_name)
+      raise RuntimeError(f"Client action {action_name} not found.")
 
     if action.in_rdfvalue is None:
       if request:
-        raise RuntimeError("Client action %s does not expect args." %
-                           action_name)
-    else:
-      if request is None:
-        # Create a new rdf request.
-        request = action.in_rdfvalue(**kwargs)
-      else:
-        # Verify that the request type matches the client action requirements.
-        if not isinstance(request, action.in_rdfvalue):
-          raise RuntimeError("Client action expected %s but got %s" % (
-              action.in_rdfvalue, type(request)))
+        raise RuntimeError(f"Client action {action_name} does not expect args.")
+    elif request is None:
+      # Create a new rdf request.
+      request = action.in_rdfvalue(**kwargs)
+    elif not isinstance(request, action.in_rdfvalue):
+      raise RuntimeError(
+          f"Client action expected {action.in_rdfvalue} but got {type(request)}")
 
     outbound_id = self.GetNextOutboundId()
 
@@ -666,8 +654,8 @@ class FlowRunner(object):
     if self.context.remaining_cpu_quota:
       msg.cpu_limit = int(self.context.remaining_cpu_quota)
 
-    cpu_usage = self.context.client_resources.cpu_usage
     if self.context.args.cpu_limit:
+      cpu_usage = self.context.client_resources.cpu_usage
       msg.cpu_limit = max(
           self.context.args.cpu_limit - cpu_usage.user_cpu_time -
           cpu_usage.system_cpu_time, 0)
@@ -689,10 +677,10 @@ class FlowRunner(object):
     """Sends the message to event listeners."""
     handler_urns = []
 
-    # This is the cache of event names to handlers.
-    event_map = self.flow_obj.EventListener.EVENT_NAME_MAP
-
     if isinstance(event_name, basestring):
+      # This is the cache of event names to handlers.
+      event_map = self.flow_obj.EventListener.EVENT_NAME_MAP
+
       for event_cls in event_map.get(event_name, []):
         if event_cls.well_known_session_id is None:
           logging.error("Well known flow %s has no session_id.",
@@ -768,14 +756,11 @@ class FlowRunner(object):
     Returns:
        The URN of the child flow which was created.
     """
-    if self.process_requests_in_order:
-      # Check that the next state is allowed
-      if next_state and next_state not in self.context.next_states:
-        raise FlowRunnerError("Flow %s: State '%s' called to '%s' which is "
-                              "not declared in decorator." % (
-                                  self.__class__.__name__,
-                                  self.context.current_state,
-                                  next_state))
+    if (self.process_requests_in_order and next_state
+        and next_state not in self.context.next_states):
+      raise FlowRunnerError(
+          f"Flow {self.__class__.__name__}: State '{self.context.current_state}' called to '{next_state}' which is not declared in decorator."
+      )
 
     client_id = client_id or self.args.client_id
 
@@ -903,8 +888,10 @@ class FlowRunner(object):
                       client_id)
 
       self.Notify(
-          "FlowStatus", client_id,
-          "Flow (%s) terminated due to error" % self.session_id)
+          "FlowStatus",
+          client_id,
+          f"Flow ({self.session_id}) terminated due to error",
+      )
 
   def GetState(self):
     return self.context.state
@@ -1002,22 +989,20 @@ class FlowRunner(object):
 
     self.context.network_bytes_sent += status.network_bytes_sent
 
-    if self.context.args.cpu_limit:
-      if self.context.args.cpu_limit < (user_cpu_total + system_cpu_total):
-        # We have exceeded our limit, stop this flow.
-        raise FlowRunnerError("CPU limit exceeded.")
+    if self.context.args.cpu_limit and self.context.args.cpu_limit < (
+        user_cpu_total + system_cpu_total):
+      # We have exceeded our limit, stop this flow.
+      raise FlowRunnerError("CPU limit exceeded.")
 
-    if self.context.args.network_bytes_limit:
-      if (self.context.args.network_bytes_limit <
-          self.context.network_bytes_sent):
-        # We have exceeded our byte limit, stop this flow.
-        raise FlowRunnerError("Network bytes limit exceeded.")
+    if self.context.args.network_bytes_limit and (
+        self.context.args.network_bytes_limit < self.context.network_bytes_sent):
+      # We have exceeded our byte limit, stop this flow.
+      raise FlowRunnerError("Network bytes limit exceeded.")
 
   def SaveResourceUsage(self, request, responses):
     """Method automatically called from the StateHandler to tally resource."""
     _ = request
-    status = responses.status
-    if status:
+    if status := responses.status:
       # Do this last since it may raise "CPU limit exceeded".
       self.UpdateProtoResources(status)
 
@@ -1112,7 +1097,7 @@ class FlowRunner(object):
         client_fd = aff4.FACTORY.Open(self.args.client_id, mode="rw",
                                       token=self.token)
         hostname = client_fd.Get(client_fd.Schema.HOSTNAME) or ""
-        client_msg = "%s: %s" % (hostname, msg)
+        client_msg = f"{hostname}: {msg}"
       else:
         client_msg = msg
 
@@ -1139,10 +1124,8 @@ class FlowRunner(object):
       # Disable further notifications.
       self.context.user_notified = True
 
-    # Allow the flow to either specify an event name or an event handler URN.
-    notification_event = (self.args.notification_event or
-                          self.args.notification_urn)
-    if notification_event:
+    if notification_event := (self.args.notification_event
+                              or self.args.notification_urn):
       if self.context.state == rdfvalue.Flow.State.ERROR:
         status = rdfvalue.FlowNotification.Status.ERROR
 

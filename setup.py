@@ -65,25 +65,21 @@ def GRRGetPackagePrefix(package_name):
   package_components = package_name.split(".")
 
   if len(package_components) > 2:
-    package_path_prefix = os.path.join(package_components[1:])
+    return os.path.join(package_components[1:])
   elif len(package_components) == 2:
-    package_path_prefix = package_components[1]
+    return package_components[1]
   else:
-    package_path_prefix = ""
-
-  return package_path_prefix
+    return ""
 
 
 def GRRGetPackagePath(package_path_prefix, sub_path):
   """Determine the package path from the package path prefix and sub path."""
   if package_path_prefix and sub_path:
-    package_path = os.path.join(package_path_prefix, sub_path)
+    return os.path.join(package_path_prefix, sub_path)
   elif sub_path:
-    package_path = sub_path
+    return sub_path
   else:
-    package_path = package_path_prefix
-
-  return package_path
+    return package_path_prefix
 
 
 def GRRGetRelativeFilename(package_path_prefix, filename):
@@ -117,9 +113,7 @@ def GRRFindDataFiles(data_files_specs):
     for sub_path in sub_paths:
       package_path = GRRGetPackagePath(package_path_prefix, sub_path)
 
-      for filename in GRRFind(package_path, patterns):
-        package_data_files.append(filename)
-
+      package_data_files.extend(iter(GRRFind(package_path, patterns)))
     data_files.setdefault(package_name, [])
 
     for filename in package_data_files:
@@ -140,9 +134,7 @@ def GRRFindPackages():
   """
   packages = ["grr"]
 
-  for package in find_packages("."):
-    packages.append("grr." + package)
-
+  packages.extend(f"grr.{package}" for package in find_packages("."))
   return packages
 
 

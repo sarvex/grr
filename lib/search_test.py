@@ -28,9 +28,7 @@ class SearchTest(test_lib.FlowTestsBaseclass):
     client1.Flush()
     client2.Flush()
 
-    # Search for something indexed on two clients.
-    results = list(search.SearchClients("lmao.example.com", token=self.token))
-    results.sort()
+    results = sorted(search.SearchClients("lmao.example.com", token=self.token))
     self.assertEqual(results[0], client1.urn)
     self.assertEqual(len(results), 2)
 
@@ -45,10 +43,10 @@ class SearchTest(test_lib.FlowTestsBaseclass):
 
     # Check we can search mac addresses with or without index.
     mac_addr = str(macs).split()[0]
-    results = list(search.SearchClients("mac:%s" % mac_addr, token=self.token))
+    results = list(search.SearchClients(f"mac:{mac_addr}", token=self.token))
     self.assertEqual(results[0], client1.urn)
     self.assertEqual(len(results), 1)
-    results = list(search.SearchClients("%s" % mac_addr, token=self.token))
+    results = list(search.SearchClients(f"{mac_addr}", token=self.token))
     self.assertEqual(results[0], client1.urn)
     self.assertEqual(len(results), 1)
 
@@ -57,7 +55,7 @@ class SearchTest(test_lib.FlowTestsBaseclass):
     results = list(search.SearchClients(mac_addr.upper(), token=self.token))
     self.assertEqual(len(results), 1)
     # Check we handle mac addresses in : format with prefix.
-    results = list(search.SearchClients("mac:%s" % mac_addr, token=self.token))
+    results = list(search.SearchClients(f"mac:{mac_addr}", token=self.token))
     self.assertEqual(len(results), 1)
 
     # Check searching for IP addresses.

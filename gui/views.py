@@ -66,7 +66,7 @@ def Homepage(request):
       module_components = cls.__module__.split(".")
       # Only include files corresponding to renderers in "plugins" package.
       if module_components[-2] == "plugins":
-        renderers_js_files.add(module_components[-1] + ".js")
+        renderers_js_files.add(f"{module_components[-1]}.js")
 
   create_time = psutil.Process(os.getpid()).create_time()
   context = {"page_title": config_lib.CONFIG["AdminUI.page_title"],
@@ -105,7 +105,7 @@ def RenderBinaryDownload(request):
   filename = aff4_path.Basename()
   response = http.HttpResponse(content=Generator(),
                                content_type="binary/octet-stream")
-  response["Content-Disposition"] = ("attachment; filename=%s" % filename)
+  response["Content-Disposition"] = f"attachment; filename={filename}"
   return response
 
 
@@ -224,15 +224,14 @@ def RenderHelp(request, path, document_root=None, content_type=None):
   if settings.docs_location == settings.DocsLocation.REMOTE:
     # Proxy remote documentation.
     return RedirectToRemoteHelp(help_path)
-  else:
-    # Serve prebuilt docs using static handler. To do that we have
-    # to resolve static handler's name to an actual function object.
-    static_handler_components = urls.static_handler.split(".")
-    static_handler_module = importlib.import_module(".".join(
-        static_handler_components[0:-1]))
-    static_handler = getattr(static_handler_module,
-                             static_handler_components[-1])
-    return static_handler(request, path, document_root=urls.help_root)
+  # Serve prebuilt docs using static handler. To do that we have
+  # to resolve static handler's name to an actual function object.
+  static_handler_components = urls.static_handler.split(".")
+  static_handler_module = importlib.import_module(".".join(
+      static_handler_components[:-1]))
+  static_handler = getattr(static_handler_module,
+                           static_handler_components[-1])
+  return static_handler(request, path, document_root=urls.help_root)
 
 
 def BuildToken(request, execution_time):
@@ -244,8 +243,7 @@ def BuildToken(request, execution_time):
       expiry=rdfvalue.RDFDatetime().Now() + execution_time)
 
   for field in ["REMOTE_ADDR", "HTTP_X_FORWARDED_FOR"]:
-    remote_addr = request.META.get(field, "")
-    if remote_addr:
+    if remote_addr := request.META.get(field, ""):
       token.source_ips.append(remote_addr)
   return token
 

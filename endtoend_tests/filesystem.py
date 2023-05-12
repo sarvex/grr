@@ -30,7 +30,7 @@ class TestListDirectoryOSLinuxDarwin(base.AutomatedTest):
     if pos > 0:
       base_urn = self.client_id.Add(self.output_path[:pos])
       for urn in base.RecursiveListChildren(prefix=base_urn):
-        if re.search(self.output_path + "$", str(urn)):
+        if re.search(f"{self.output_path}$", str(urn)):
           self.delete_urns.add(urn.Add(self.file_to_find))
           self.delete_urns.add(urn)
           break

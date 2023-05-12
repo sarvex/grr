@@ -129,7 +129,19 @@ class EnumerateInterfaces(actions.ActionPlugin):
       ifs.add(ifname)
       try:
         iffamily = ord(m.contents.ifa_addr[0])
-        if iffamily == 0x2:     # AF_INET
+        if iffamily == 0xA:
+          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrin6))
+          ip6 = "".join(map(chr, data.contents.sin6_addr))
+          address_type = rdfvalue.NetworkAddress.Family.INET6
+          address = rdfvalue.NetworkAddress(address_type=address_type,
+                                            packed_bytes=ip6)
+          addresses.setdefault(ifname, []).append(address)
+        elif iffamily == 0x11:
+          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrll))
+          addlen = data.contents.sll_halen
+          macs[ifname] = "".join(map(chr, data.contents.sll_addr[:addlen]))
+
+        elif iffamily == 0x2:
           data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrin))
           ip4 = "".join(map(chr, data.contents.sin_addr))
           address_type = rdfvalue.NetworkAddress.Family.INET
@@ -137,18 +149,6 @@ class EnumerateInterfaces(actions.ActionPlugin):
                                             packed_bytes=ip4)
           addresses.setdefault(ifname, []).append(address)
 
-        if iffamily == 0x11:    # AF_PACKET
-          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrll))
-          addlen = data.contents.sll_halen
-          macs[ifname] = "".join(map(chr, data.contents.sll_addr[:addlen]))
-
-        if iffamily == 0xA:     # AF_INET6
-          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrin6))
-          ip6 = "".join(map(chr, data.contents.sin6_addr))
-          address_type = rdfvalue.NetworkAddress.Family.INET6
-          address = rdfvalue.NetworkAddress(address_type=address_type,
-                                            packed_bytes=ip6)
-          addresses.setdefault(ifname, []).append(address)
       except ValueError:
         # Some interfaces don't have a iffamily and will raise a null pointer
         # exception. We still want to send back the name.
@@ -232,8 +232,7 @@ class EnumerateUsers(actions.ActionPlugin):
             continue
 
           try:
-            if users[record.ut_user] < record.tv_sec:
-              users[record.ut_user] = record.tv_sec
+            users[record.ut_user] = max(users[record.ut_user], record.tv_sec)
           except KeyError:
             users[record.ut_user] = record.tv_sec
 
@@ -243,10 +242,7 @@ class EnumerateUsers(actions.ActionPlugin):
     """Enumerates all the users on this system."""
     users = self.ParseWtmp()
     for user, last_login in users.iteritems():
-      # Lose the null termination
-      username = user.split("\x00", 1)[0]
-
-      if username:
+      if username := user.split("\x00", 1)[0]:
         try:
           pwdict = pwd.getpwnam(username)
           homedir = pwdict[5]    # pw_dir
@@ -258,9 +254,7 @@ class EnumerateUsers(actions.ActionPlugin):
         # Somehow the last login time can be < 0. There is no documentation
         # what this means so we just set it to 0 (the rdfvalue field is
         # unsigned so we can't send negative values).
-        if last_login < 0:
-          last_login = 0
-
+        last_login = max(last_login, 0)
         self.SendReply(username=utils.SmartUnicode(username),
                        homedir=utils.SmartUnicode(homedir),
                        full_name=utils.SmartUnicode(full_name),

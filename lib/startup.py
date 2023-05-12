@@ -24,7 +24,7 @@ if platform.system() != "Windows":
 def AddConfigContext():
   """Add the running contexts to the config system."""
   # Initialize the running platform context:
-  config_lib.CONFIG.AddContext("Platform:%s" % platform.system().title())
+  config_lib.CONFIG.AddContext(f"Platform:{platform.system().title()}")
 
   if platform.architecture()[0] == "32bit":
     config_lib.CONFIG.AddContext("Arch:i386")

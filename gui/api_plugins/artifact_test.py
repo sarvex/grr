@@ -49,8 +49,7 @@ class ArtifactRendererTest(artifact_test.ArtifactBaseTest):
     self.assertFalse(rendering)
 
   def _renderTestArtifacts(self):
-    rendering = self.renderer.Render(None, token=self.token)
-    return rendering
+    return self.renderer.Render(None, token=self.token)
 
   def testPrepackagedArtifacts(self):
     rendering = self._renderTestArtifacts()

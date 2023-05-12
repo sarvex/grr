@@ -176,7 +176,7 @@ class TextView(renderers.TemplateRenderer):
       buf = self.ReadBuffer(request, self.offset, self.data_size)
       self.data = self._Decode(text_encoding, buf)
     except RuntimeError as e:
-      self.error = "Failed to decode: %s" % utils.SmartStr(e)
+      self.error = f"Failed to decode: {utils.SmartStr(e)}"
 
     return renderers.TemplateRenderer.Layout(self, request, response,
                                              self.action_template)

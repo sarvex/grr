@@ -5,6 +5,7 @@ This handles invocations for the build across the supported platforms including
 handling Visual Studio, pyinstaller and other packaging mechanisms.
 """
 
+
 import logging
 import os
 import platform
@@ -24,11 +25,7 @@ from grr.lib import startup
 parser = flags.PARSER
 
 # Guess which arch we should be building based on where we are running.
-if platform.architecture()[0] == "32bit":
-  default_arch = "i386"
-else:
-  default_arch = "amd64"
-
+default_arch = "i386" if platform.architecture()[0] == "32bit" else "amd64"
 default_platform = platform.system().lower()
 parser.add_argument(
     "--platform", choices=["darwin", "linux", "windows"],
@@ -136,10 +133,6 @@ def GetBuilder(context):
       context = ["Platform:Darwin"] + context
       builder_obj = builders.DarwinClientBuilder
 
-    elif args.platform == "windows":
-      context = ["Platform:Windows"] + context
-      builder_obj = builders.WindowsClientBuilder
-
     elif args.platform == "linux":
       if args.package_format == "deb":
         context = ["Platform:Linux"] + context
@@ -148,10 +141,15 @@ def GetBuilder(context):
         context = ["Platform:Linux", "Target:LinuxRpm"] + context
         builder_obj = builders.CentosClientBuilder
       else:
-        parser.error("Couldn't guess packaging format for: %s" %
-                     platform.linux_distribution()[0])
+        parser.error(
+            f"Couldn't guess packaging format for: {platform.linux_distribution()[0]}"
+        )
+    elif args.platform == "windows":
+      context = ["Platform:Windows"] + context
+      builder_obj = builders.WindowsClientBuilder
+
     else:
-      parser.error("Unsupported build platform: %s" % args.platform)
+      parser.error(f"Unsupported build platform: {args.platform}")
 
   except AttributeError:
     raise RuntimeError("Unable to build for platform %s when running "
@@ -166,10 +164,6 @@ def GetDeployer(context):
     context = ["Platform:Darwin"] + context
     deployer_obj = build.DarwinClientDeployer
 
-  elif args.platform == "windows":
-    context = ["Platform:Windows"] + context
-    deployer_obj = build.WindowsClientDeployer
-
   elif args.platform == "linux":
     if args.package_format == "deb":
       context = ["Platform:Linux"] + context
@@ -178,8 +172,12 @@ def GetDeployer(context):
       context = ["Platform:Linux", "Target:LinuxRpm"] + context
       deployer_obj = build.CentosClientDeployer
 
+  elif args.platform == "windows":
+    context = ["Platform:Windows"] + context
+    deployer_obj = build.WindowsClientDeployer
+
   else:
-    parser.error("Unsupported build platform: %s" % args.platform)
+    parser.error(f"Unsupported build platform: {args.platform}")
 
   return deployer_obj(context=context)
 

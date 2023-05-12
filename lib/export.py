@@ -178,8 +178,7 @@ class ExportConverter(object):
       types.
     """
     for metadata, value in metadata_value_pairs:
-      for result in self.Convert(metadata, value, token):
-        yield result
+      yield from self.Convert(metadata, value, token)
 
   @staticmethod
   def GetConvertersByValue(value):
@@ -208,7 +207,7 @@ class DataAgnosticExportConverter(ExportConverter):
   classes_cache = {}
 
   def ExportedClassNameForValue(self, value):
-    return utils.SmartStr("Exported" + value.__class__.__name__)
+    return utils.SmartStr(f"Exported{value.__class__.__name__}")
 
   def MakeFlatRDFClass(self, value):
     """Generates flattened RDFValue class definition for the given value."""
@@ -269,8 +268,7 @@ class DataAgnosticExportConverter(ExportConverter):
 
   def BatchConvert(self, metadata_value_pairs, token=None):
     for metadata, value in metadata_value_pairs:
-      for result in self.Convert(metadata, value, token=token):
-        yield result
+      yield from self.Convert(metadata, value, token=token)
 
 
 class StatEntryToExportedFileConverter(ExportConverter):
@@ -335,12 +333,10 @@ class StatEntryToExportedFileConverter(ExportConverter):
       Resulting ExportedFile values. Empty list is a valid result and means that
       conversion wasn't possible.
     """
-    filtered_pairs = []
-    for metadata, stat_entry in metadata_value_pairs:
-      # Ignore registry keys.
-      if stat_entry.pathspec.pathtype != rdfvalue.PathSpec.PathType.REGISTRY:
-        filtered_pairs.append((metadata, stat_entry))
-
+    filtered_pairs = [
+        (metadata, stat_entry) for metadata, stat_entry in metadata_value_pairs
+        if stat_entry.pathspec.pathtype != rdfvalue.PathSpec.PathType.REGISTRY
+    ]
     if self.options.export_files_hashes or self.options.export_files_contents:
       aff4_paths = [stat_entry.aff4path
                     for metadata, stat_entry in metadata_value_pairs]
@@ -370,9 +366,8 @@ class StatEntryToExportedFileConverter(ExportConverter):
         try:
           aff4_object = fds_dict[stat_entry.aff4path]
 
-          if self.options.export_files_hashes:
-            hash_obj = aff4_object.Get(aff4_object.Schema.HASH)
-            if hash_obj:
+          if hash_obj := aff4_object.Get(aff4_object.Schema.HASH):
+            if self.options.export_files_hashes:
               self.ParseFileHash(hash_obj, result)
 
           if self.options.export_files_contents:
@@ -543,11 +538,11 @@ class DNSClientConfigurationToExportedDNSClientConfiguration(ExportConverter):
 
   def Convert(self, metadata, config, token=None):
     """Converts DNSClientConfiguration to ExportedDNSClientConfiguration."""
-    result = ExportedDNSClientConfiguration(
+    yield ExportedDNSClientConfiguration(
         metadata=metadata,
         dns_servers=" ".join(config.dns_server),
-        dns_suffixes=" ".join(config.dns_suffix))
-    yield result
+        dns_suffixes=" ".join(config.dns_suffix),
+    )
 
 
 class ClientSummaryToExportedNetworkInterfaceConverter(
@@ -609,9 +604,9 @@ class FileFinderResultConverter(ExportConverter):
     for metadata, val in metadata_value_pairs:
       matches.extend([(metadata, match) for match in val.matches])
 
-    for result in ConvertValuesWithMetadata(matches, token=token,
-                                            options=self.options):
-      yield result
+    yield from ConvertValuesWithMetadata(matches,
+                                         token=token,
+                                         options=self.options)
 
   def Convert(self, metadata, result, token=None):
     return self.BatchConvert([(metadata, result)], token=token)
@@ -631,18 +626,13 @@ class RDFURNConverter(ExportConverter):
     return self.BatchConvert([(metadata, stat_entry)], token=token)
 
   def BatchConvert(self, metadata_value_pairs, token=None):
-    urn_metadata_pairs = []
-    for metadata, value in metadata_value_pairs:
-      if isinstance(value, rdfvalue.RDFURN):
-        urn_metadata_pairs.append((value, metadata))
-
+    urn_metadata_pairs = [(value, metadata)
+                          for metadata, value in metadata_value_pairs
+                          if isinstance(value, rdfvalue.RDFURN)]
     urns_dict = dict(urn_metadata_pairs)
     fds = aff4.FACTORY.MultiOpen(urns_dict.iterkeys(), mode="r", token=token)
 
-    batch = []
-    for fd in fds:
-      batch.append((urns_dict[fd.urn], fd))
-
+    batch = [(urns_dict[fd.urn], fd) for fd in fds]
     try:
       return ConvertValuesWithMetadata(batch)
     except NoConverterFound as e:
@@ -662,10 +652,10 @@ class RDFValueCollectionConverter(ExportConverter):
       return
 
     for batch in utils.Grouper(collection, self.BATCH_SIZE):
-      converted_batch = ConvertValues(metadata, batch, token=token,
-                                      options=self.options)
-      for v in converted_batch:
-        yield v
+      yield from ConvertValues(metadata,
+                               batch,
+                               token=token,
+                               options=self.options)
 
 
 class VFSFileToExportedFileConverter(ExportConverter):
@@ -695,8 +685,7 @@ class VFSFileToExportedFileConverter(ExportConverter):
                           st_rdev=stat_entry.st_rdev,
                           symlink=stat_entry.symlink)
 
-    hash_obj = vfs_file.Get(vfs_file.Schema.HASH)
-    if hash_obj:
+    if hash_obj := vfs_file.Get(vfs_file.Schema.HASH):
       StatEntryToExportedFileConverter.ParseFileHash(hash_obj, result)
 
     return [result]
@@ -949,9 +938,7 @@ class RekallResponseConverter(ExportConverter):
   def _ParseJsonMessages(self, messages):
     """Parses json messages using Rekall DataExportRenderer."""
 
-    json_data = json.loads(messages)
-    for message in json_data:
-      yield message
+    yield from json.loads(messages)
 
   def _GenerateOutputClass(self, class_name, context_dict):
     """Generates output class with a given name for a given context."""
@@ -998,7 +985,7 @@ class RekallResponseConverter(ExportConverter):
     return output_class
 
   def _GetOutputClass(self, plugin_name, context_dict):
-    output_class_name = "RekallExport_" + plugin_name
+    output_class_name = f"RekallExport_{plugin_name}"
 
     try:
       return RekallResponseConverter.OUTPUT_CLASSES[output_class_name]
@@ -1011,13 +998,10 @@ class RekallResponseConverter(ExportConverter):
     """Handles a single row in one of the tables in RekallResponse."""
 
     output_class = self._GetOutputClass(plugin_name, context_dict)
-    attrs = {}
-    for key, value in message[1].iteritems():
-      if hasattr(output_class, key):
-        # ProtoString expects a unicode object, so let's convert
-        # everything to unicode strings.
-        attrs[key] = utils.SmartUnicode(self._RenderObject(value))
-
+    attrs = {
+        key: utils.SmartUnicode(self._RenderObject(value))
+        for key, value in message[1].iteritems() if hasattr(output_class, key)
+    }
     result = output_class(**attrs)
     result.metadata = metadata
 
@@ -1057,8 +1041,7 @@ class RekallResponseConverter(ExportConverter):
     """Convert batch of RekallResponses."""
 
     for metadata, rekall_response in metadata_value_pairs:
-      for result in self.Convert(metadata, rekall_response):
-        yield result
+      yield from self.Convert(metadata, rekall_response)
 
 
 def GetMetadata(client, token=None):
@@ -1148,9 +1131,7 @@ def ConvertValuesWithMetadata(metadata_value_pairs, token=None, options=None):
 
     converters = [cls(options) for cls in converters_classes]
     for converter in converters:
-      for result in converter.BatchConvert(metadata_values_group, token=token):
-        yield result
-
+      yield from converter.BatchConvert(metadata_values_group, token=token)
   if no_converter_found_error is not None:
     raise NoConverterFound(no_converter_found_error)
 

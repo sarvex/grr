@@ -46,8 +46,7 @@ class ApiValueRenderer(object):
           candidates.append((candidate, candidate_class))
 
       if not candidates:
-        raise RuntimeError("No renderer found for value %s." %
-                           value.__class__.__name__)
+        raise RuntimeError(f"No renderer found for value {value.__class__.__name__}.")
 
       candidates = sorted(candidates,
                           key=lambda candidate: len(candidate[1].mro()))
@@ -81,20 +80,14 @@ class ApiValueRenderer(object):
       return type_list
 
   def _IncludeTypeInfoIfNeeded(self, result, original_value):
-    # If type information is needed, converted value is placed in the
-    # resulting dictionary under the 'value' key.
-    if self.with_types:
-      if hasattr(original_value, "age"):
-        age = original_value.age.AsSecondsFromEpoch()
-      else:
-        age = 0
-
-      return dict(type=original_value.__class__.__name__,
-                  mro=self._GetTypeList(original_value),
-                  value=result,
-                  age=age)
-    else:
+    if not self.with_types:
       return result
+    age = (original_value.age.AsSecondsFromEpoch() if hasattr(
+        original_value, "age") else 0)
+    return dict(type=original_value.__class__.__name__,
+                mro=self._GetTypeList(original_value),
+                value=result,
+                age=age)
 
   def RenderValue(self, value):
     return self._IncludeTypeInfoIfNeeded(utils.SmartUnicode(value), value)
@@ -153,11 +146,7 @@ class ApiDictRenderer(ApiValueRenderer):
   value_class = dict
 
   def RenderValue(self, value):
-    result = {}
-    for k, v in value.items():
-      result[k] = self._PassThrough(v)
-
-    return result
+    return {k: self._PassThrough(v) for k, v in value.items()}
 
 
 class ApiListRenderer(ApiValueRenderer):

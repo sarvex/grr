@@ -129,10 +129,7 @@ class _Metric(object):
     self._values = {}
 
   def _FieldsToKey(self, fields):
-    if not fields:
-      return ("__default__",)
-    else:
-      return tuple(fields)
+    return ("__default__", ) if not fields else tuple(fields)
 
   def _DefaultValue(self):
     return ""
@@ -147,8 +144,7 @@ class _Metric(object):
       raise ValueError("Metric was registered with fields (%s), "
                        "but no fields were provided." % self.fields_defs)
 
-    if (self.fields_defs is not None and fields is not None and
-        len(self.fields_defs) != len(fields)):
+    if self.fields_defs is not None and len(self.fields_defs) != len(fields):
       raise ValueError("Metric was registered with %d fields (%s), but "
                        "%d fields were provided (%s)." % (len(self.fields_defs),
                                                           self.fields_defs,
@@ -162,10 +158,7 @@ class _Metric(object):
 
   def ListFieldsValues(self):
     """Lists all fields values that were used with this metric."""
-    if self.fields_defs:
-      return self._values.iterkeys()
-    else:
-      return []
+    return self._values.iterkeys() if self.fields_defs else []
 
 
 class _CounterMetric(_Metric):
@@ -267,10 +260,7 @@ class _GaugeMetric(_Metric):
   def Get(self, fields=None):
     """Returns current metric's value (executing callback if needed)."""
     result = super(_GaugeMetric, self).Get(fields=fields)
-    if hasattr(result, "__call__"):
-      return result()
-    else:
-      return result
+    return result() if hasattr(result, "__call__") else result
 
 
 class MetricFieldDefinition(rdfvalue.RDFProtoStruct):
@@ -318,7 +308,7 @@ class StatsCollector(object):
     elif value_type == float:
       value_type = MetricMetadata.ValueType.FLOAT
     else:
-      raise ValueError("Unknown value type: %s" % value_type)
+      raise ValueError(f"Unknown value type: {value_type}")
 
     return value_type
 
@@ -336,7 +326,7 @@ class StatsCollector(object):
       elif field_type == str:
         field_type = MetricFieldDefinition.FieldType.STR
       else:
-        raise ValueError("Unknown field type: %s" % field_type)
+        raise ValueError(f"Unknown field type: {field_type}")
 
       result.append(MetricFieldDefinition(field_name=field_name,
                                           field_type=field_type))

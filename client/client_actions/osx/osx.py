@@ -155,7 +155,14 @@ class EnumerateInterfaces(actions.ActionPlugin):
       ifs.add(ifname)
       try:
         iffamily = ord(m.contents.ifa_addr[1])
-        if iffamily == 0x2:     # AF_INET
+        if iffamily == 0x12:
+          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrdl))
+          iflen = data.contents.sdl_nlen
+          addlen = data.contents.sdl_alen
+          macs[ifname] = "".join(
+              map(chr, data.contents.sdl_data[iflen:iflen + addlen]))
+
+        elif iffamily == 0x2:
           data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrin))
           ip4 = "".join(map(chr, data.contents.sin_addr))
           address_type = rdfvalue.NetworkAddress.Family.INET
@@ -163,14 +170,7 @@ class EnumerateInterfaces(actions.ActionPlugin):
                                             packed_bytes=ip4)
           addresses.setdefault(ifname, []).append(address)
 
-        if iffamily == 0x12:    # AF_LINK
-          data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrdl))
-          iflen = data.contents.sdl_nlen
-          addlen = data.contents.sdl_alen
-          macs[ifname] = "".join(
-              map(chr, data.contents.sdl_data[iflen:iflen + addlen]))
-
-        if iffamily == 0x1E:     # AF_INET6
+        elif iffamily == 0x1E:
           data = ctypes.cast(m.contents.ifa_addr, ctypes.POINTER(Sockaddrin6))
           ip6 = "".join(map(chr, data.contents.sin6_addr))
           address_type = rdfvalue.NetworkAddress.Family.INET6
@@ -239,8 +239,7 @@ class EnumerateFilesystems(actions.ActionPlugin):
         for volume in vol_inf:
           if volume.flags == pytsk3.TSK_VS_PART_FLAG_ALLOC:
             offset = volume.start * vol_inf.info.block_size
-            self.SendReply(device=path + ":" + str(offset),
-                           type="partition")
+            self.SendReply(device=f"{path}:{str(offset)}", type="partition")
 
       except (IOError, RuntimeError):
         continue
@@ -298,11 +297,11 @@ class OSXEnumerateRunningServices(actions.ActionPlugin):
 
     mach_dict = job.get("MachServices", {}, stringify=False)
     for key, value in mach_dict.iteritems():
-      service.machservice.Append("%s:%s" % (key, value))
+      service.machservice.Append(f"{key}:{value}")
 
     job_mach_dict = job.get("PerJobMachServices", {}, stringify=False)
     for key, value in job_mach_dict.iteritems():
-      service.perjobmachservice.Append("%s:%s" % (key, value))
+      service.perjobmachservice.Append(f"{key}:{value}")
 
     if "PID" in job:
       service.pid = job["PID"].value
@@ -337,11 +336,7 @@ class Uninstall(actions.ActionPlugin):
       else:
         msg = "Could not remove plist file."
 
-    # Get the directory we are running in from pyinstaller. This is either the
-    # GRR directory which we should delete (onedir mode) or a generated temp
-    # directory which we can delete without problems in onefile mode.
-    directory = getattr(sys, "_MEIPASS", None)
-    if directory:
+    if directory := getattr(sys, "_MEIPASS", None):
       shutil.rmtree(directory, ignore_errors=True)
 
     self.SendReply(string=msg)
@@ -368,7 +363,7 @@ class InstallDriver(actions.ActionPlugin):
     for directory, _, _ in os.walk(path):
       if directory.endswith(".kext"):
         return directory
-    raise RuntimeError("No .kext directory under %s" % path)
+    raise RuntimeError(f"No .kext directory under {path}")
 
   def Run(self, args):
     """Initializes the driver."""

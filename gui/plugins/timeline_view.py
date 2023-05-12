@@ -31,8 +31,7 @@ class TimelineViewRenderer(semantic.RDFValueArrayRenderer):
   def Layout(self, request, response):
     client_id = request.REQ.get("client_id")
 
-    container = request.REQ.get("aff4_path", "")
-    if container:
+    if container := request.REQ.get("aff4_path", ""):
       self.container = rdfvalue.RDFURN(container)
       self.hash_dict = dict(
           container=self.container, main="TimelineMain", c=client_id,
@@ -209,7 +208,7 @@ class EventTable(renderers.TableRenderer):
     container = request.REQ.get("container")
 
     key = utils.SmartUnicode(container)
-    key += ":" + query + ":%d"
+    key += f":{query}:%d"
     try:
       events = self.content_cache.Get(key % start_row)
       self.content_cache.ExpireObject(key % start_row)
@@ -277,8 +276,7 @@ class EventSubjectView(fileview.AFF4Stats):
   """
 
   def GetEvent(self, request):
-    event_id = request.REQ.get("event")
-    if event_id:
+    if event_id := request.REQ.get("event"):
       event_id = int(event_id)
       container = request.REQ.get("container")
       fd = aff4.FACTORY.Open(container, token=request.token)
@@ -291,8 +289,7 @@ class EventSubjectView(fileview.AFF4Stats):
 
   def Layout(self, request, response):
     """Find the event and show stats about it."""
-    event = self.GetEvent(request)
-    if event:
+    if event := self.GetEvent(request):
       subject = aff4.FACTORY.Open(event.subject, token=request.token,
                                   age=aff4.ALL_TIMES)
       self.classes = self.RenderAFF4Attributes(subject, request)
@@ -309,12 +306,10 @@ class EventView(EventSubjectView):
 
   def Layout(self, request, response):
     """Retrieve the event aff4 object."""
-    event = self.GetEvent(request)
-    if event:
+    if event := self.GetEvent(request):
       event_class = aff4.AFF4Object.classes["AFF4Event"]
       self.classes = self.RenderAFF4Attributes(event_class(event), request)
-      self.path = "Event %s at %s" % (event.id,
-                                      rdfvalue.RDFDatetime(event.timestamp))
+      self.path = f"Event {event.id} at {rdfvalue.RDFDatetime(event.timestamp)}"
 
       return renderers.TemplateRenderer.Layout(self, request, response)
 

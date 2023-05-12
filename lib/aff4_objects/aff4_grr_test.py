@@ -76,8 +76,8 @@ class AFF4GRRTest(test_lib.AFF4ObjectTest):
 
     users = fd.Schema.USER()
     for i in range(5):
-      folder = "C:/Users/user%s" % i
-      user = rdfvalue.User(username="user%s" % i)
+      folder = f"C:/Users/user{i}"
+      user = rdfvalue.User(username=f"user{i}")
       user.special_folders.app_data = folder
       users.Append(user)
 
@@ -87,7 +87,7 @@ class AFF4GRRTest(test_lib.AFF4ObjectTest):
     # Check the repeated Users array.
     for i, folder in enumerate(
         fd.GetValuesForAttribute("Users.special_folders.app_data")):
-      self.assertEqual(folder, "C:/Users/user%s" % i)
+      self.assertEqual(folder, f"C:/Users/user{i}")
 
   def testRegexChangeNotification(self):
     """Test the AFF4RegexNotificationRule rule."""

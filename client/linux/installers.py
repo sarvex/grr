@@ -28,12 +28,13 @@ class UpdateClients(installer.Installer):
 
     try:
       data = open(old_config_file, "rb").read()
-      m = re.search(
+      if m := re.search(
           ("certificate ?= ?(-----BEGIN PRIVATE KEY-----[^-]*"
            "-----END PRIVATE KEY-----)"),
-          data, flags=re.DOTALL)
-      if m:
-        cert = m.group(1).replace("\t", "")
+          data,
+          flags=re.DOTALL,
+      ):
+        cert = m[1].replace("\t", "")
         logging.info("Found a valid private key!")
         new_config.Set("Client.private_key", cert)
         new_config.Write()

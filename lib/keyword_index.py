@@ -41,10 +41,7 @@ class AFF4KeywordIndex(aff4.AFF4Object):
 
     for _, value in data_store.DB.MultiResolveRegex(
         keyword_urns, self.INDEX_COLUMN_REGEXP, token=self.token):
-      kw_relevant = set()
-      for column, _, _ in value:
-        kw_relevant.add(column[self.INDEX_PREFIX_LEN:])
-
+      kw_relevant = {column[self.INDEX_PREFIX_LEN:] for column, _, _ in value}
       if relevant_set is None:
         relevant_set = kw_relevant
       else:
@@ -54,10 +51,7 @@ class AFF4KeywordIndex(aff4.AFF4Object):
         return set()
       keywords_found += 1
 
-    if keywords_found < len(keywords):
-      return set()
-
-    return relevant_set
+    return set() if keywords_found < len(keywords) else relevant_set
 
   def AddKeywordsForName(self, name, keywords):
     """Associates keywords with name.

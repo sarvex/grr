@@ -76,28 +76,27 @@ class ApiCallRendererRegressionTest(test_lib.GRRBaseTest):
                                         "SERVER_PORT": 1234},
                                user="test")
 
-    if method == "GET":
-      request.GET = dict(urlparse.parse_qsl(parsed_url.query))
-      request.META = {}
+    if method != "GET":
+      raise ValueError(f"Unsupported method: {method}.")
+    request.GET = dict(urlparse.parse_qsl(parsed_url.query))
+    request.META = {}
 
-      http_response = api_call_renderers.RenderHttpResponse(request)
-      content = http_response.content
+    http_response = api_call_renderers.RenderHttpResponse(request)
+    content = http_response.content
 
-      xssi_token = ")]}'\n"
-      if content.startswith(xssi_token):
-        content = content[len(xssi_token):]
+    xssi_token = ")]}'\n"
+    if content.startswith(xssi_token):
+      content = content[len(xssi_token):]
 
-      if replace:
-        for substr, repl in replace.items():
-          content = content.replace(substr, repl)
-          url = url.replace(substr, repl)
+    if replace:
+      for substr, repl in replace.items():
+        content = content.replace(substr, repl)
+        url = url.replace(substr, repl)
 
-      parsed_content = json.loads(content)
-      self.checks.append(dict(method=method, url=url,
-                              test_class=self.__class__.__name__,
-                              response=parsed_content))
-    else:
-      raise ValueError("Unsupported method: %s." % method)
+    parsed_content = json.loads(content)
+    self.checks.append(dict(method=method, url=url,
+                            test_class=self.__class__.__name__,
+                            response=parsed_content))
 
   @abc.abstractmethod
   def Run(self):
@@ -112,11 +111,10 @@ class ApiCallRendererRegressionTest(test_lib.GRRBaseTest):
       prev_data = json.load(fd)
 
     checks = prev_data[self.renderer]
-    relevant_checks = []
-    for check in checks:
-      if check["test_class"] == self.__class__.__name__:
-        relevant_checks.append(check)
-
+    relevant_checks = [
+        check for check in checks
+        if check["test_class"] == self.__class__.__name__
+    ]
     self.Run()
     # Make sure that this test has generated some checks.
     self.assertTrue(self.checks)

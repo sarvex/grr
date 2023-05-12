@@ -25,10 +25,12 @@ class SendingTestFlow(flow.GRRFlow):
   @flow.StateHandler(next_state="Incoming")
   def Start(self):
     for i in range(10):
-      self.CallClient("Test",
-                      rdfvalue.DataBlob(string="test%s" % i),
-                      data=str(i),
-                      next_state="Incoming")
+      self.CallClient(
+          "Test",
+          rdfvalue.DataBlob(string=f"test{i}"),
+          data=str(i),
+          next_state="Incoming",
+      )
 
 
 class GRRFEServerTest(test_lib.FlowTestsBaseclass):
@@ -48,7 +50,7 @@ class GRRFEServerTest(test_lib.FlowTestsBaseclass):
     # For tests, small pools are ok.
     config_lib.CONFIG.Set("Threadpool.size", 10)
 
-    prefix = "pool-%s" % self._testMethodName
+    prefix = f"pool-{self._testMethodName}"
     self.server = flow.FrontEndServer(
         certificate=config_lib.CONFIG["Frontend.certificate"],
         private_key=config_lib.CONFIG["PrivateKeys.server_key"],
@@ -172,12 +174,12 @@ class GRRFEServerTest(test_lib.FlowTestsBaseclass):
     self.assertEqual([], data_store.DB.ResolveRegex(self.client_id, "task:.*",
                                                     token=self.token))
 
-    # The well known flow messages should be waiting in the flow state now:
-    queued_messages = []
-    for predicate, _, _ in data_store.DB.ResolveRegex(
-        session_id.Add("state/request:00000000"), "flow:.*", token=self.token):
-      queued_messages.append(predicate)
-
+    queued_messages = [
+        predicate for predicate, _, _ in data_store.DB.ResolveRegex(
+            session_id.Add("state/request:00000000"),
+            "flow:.*",
+            token=self.token)
+    ]
     self.assertEqual(len(queued_messages), 9)
 
   def testDrainUpdateSessionRequestStates(self):

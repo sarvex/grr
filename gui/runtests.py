@@ -129,10 +129,7 @@ def main(_):
   trd.daemon = True
   trd.start()
 
-  user_ns = dict()
-  user_ns.update(globals())
-  user_ns.update(locals())
-
+  user_ns = globals() | locals()
   # Wait in the shell so selenium IDE can be used.
   ipshell.IPShell(argv=[], user_ns=user_ns)
 

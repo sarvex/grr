@@ -43,7 +43,7 @@ class GrrApplicationLogger(object):
     if event_time is None:
       event_time = long(time.time() * 1e6)
 
-    return "%s:%s:%s" % (event_time, socket.gethostname(), os.getpid())
+    return f"{event_time}:{socket.gethostname()}:{os.getpid()}"
 
 
 class PreLoggingMemoryHandler(handlers.BufferingHandler):

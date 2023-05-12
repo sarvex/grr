@@ -27,7 +27,7 @@ class TestStateUncleanError(Error):
 
 def RecursiveListChildren(prefix=None, token=None):
   all_urns = set()
-  act_urns = set([prefix])
+  act_urns = {prefix}
 
   while act_urns:
     next_urns = set()
@@ -121,8 +121,7 @@ class ClientTestBase(unittest.TestCase):
         # just one path anyway.
         aff4.FACTORY.Open(urn, aff4_type="AFF4Volume", token=self.token)
     except aff4.InstantiationError:
-      raise TestStateUncleanError(
-          "Path wasn't deleted: %s" % traceback.format_exc())
+      raise TestStateUncleanError(f"Path wasn't deleted: {traceback.format_exc()}")
 
   def DeleteUrn(self, urn):
     """Deletes an object from the db and the index, and flushes the caches."""
@@ -216,7 +215,7 @@ def GetClientTestTargets(client_ids=None, hostnames=None, token=None,
     for client_list in client_id_dict.values():
       client_ids.update(client_list)
 
-  client_id_set = set([rdfvalue.ClientURN(x) for x in client_ids])
+  client_id_set = {rdfvalue.ClientURN(x) for x in client_ids}
   duration_threshold = rdfvalue.Duration(checkin_duration_threshold)
   for client in aff4.FACTORY.MultiOpen(client_id_set, token=token):
     # Only test against client IDs that have checked in recently.  Test machines

@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 """Configuration parameters for the test subsystem."""
+
 import os
 from grr.lib import config_lib
 
 # Default for running in the current directory
 config_lib.DEFINE_constant_string(
     "Test.srcdir",
-    os.path.normpath(os.path.dirname(__file__) + "/../.."),
-    "The directory containing the source code.")
+    os.path.normpath(f"{os.path.dirname(__file__)}/../.."),
+    "The directory containing the source code.",
+)
 
 config_lib.DEFINE_constant_string(
     "Test.data_dir",

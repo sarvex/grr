@@ -179,7 +179,7 @@ def DoesTestHaveLabels(cls, labels):
   for name in dir(cls):
     if name.startswith("test"):
       item = getattr(cls, name, None)
-      if labels.intersection(getattr(item, "labels", set(["small"]))):
+      if labels.intersection(getattr(item, "labels", {"small"})):
         return True
 
   return False

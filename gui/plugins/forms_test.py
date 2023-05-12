@@ -2,6 +2,7 @@
 """Tests for the UI forms."""
 
 
+
 from grr.gui import runtests_test
 
 # We have to import test_lib first to properly initialize aff4 and rdfvalues.
@@ -19,10 +20,12 @@ class DefaultArgsTestFlowArgs(rdfvalue.RDFProtoStruct):
   protobuf = tests_pb2.DefaultArgsTestFlowArgs
 
 
+
+
 class DefaultArgsTestFlow(flow.GRRFlow):
   args_type = DefaultArgsTestFlowArgs
   category = "/Tests/"
-  behaviours = flow.GRRFlow.behaviours + "BASIC"
+  behaviours = f"{flow.GRRFlow.behaviours}BASIC"
 
 
 class TestForms(test_lib.GRRSeleniumTest):

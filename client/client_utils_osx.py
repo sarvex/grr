@@ -43,9 +43,8 @@ def OSXFindProxies():
         settings, "kSCPropNetProxiesProxyAutoConfigEnable")
 
     if cf_auto_enabled and bool(sc.CFNumToInt32(cf_auto_enabled)):
-      cfurl = sc.CFDictRetrieve(settings,
-                                "kSCPropNetProxiesProxyAutoConfigURLString")
-      if cfurl:
+      if cfurl := sc.CFDictRetrieve(
+          settings, "kSCPropNetProxiesProxyAutoConfigURLString"):
         unused_url = sc.CFStringToPystring(cfurl)
         # TODO(user): Auto config is enabled, what is the plan here?
         # Basically, all we get is the URL of a javascript file. To get the
@@ -61,13 +60,10 @@ def OSXFindProxies():
 
 def GetMountpoints():
   """List all the filesystems mounted on the system."""
-  devices = {}
-
-  for filesys in GetFileSystems():
-    devices[filesys.f_mntonname] = (filesys.f_mntfromname,
-                                    filesys.f_fstypename)
-
-  return devices
+  return {
+      filesys.f_mntonname: (filesys.f_mntfromname, filesys.f_fstypename)
+      for filesys in GetFileSystems()
+  }
 
 
 class StatFSStruct(utils.Struct):
@@ -295,7 +291,7 @@ class OSXVersion(object):
   def __init__(self):
     self.version = platform.mac_ver()[0]
     self.splitversion = self.version.split(".")
-    self.majorminor = self.splitversion[0:2]
+    self.majorminor = self.splitversion[:2]
 
   def VersionAsMajorMinor(self):
     """Get version as major minor array.

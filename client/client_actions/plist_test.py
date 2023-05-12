@@ -76,16 +76,16 @@ class PlistTest(test_lib.EmptyActionTest):
     self.assertEqual(matcher.Matches(test_plist_dict), True)
 
   def testActionFullRetrievalOfAPlist(self):
-    results = self._RunQuery(query="", context="")
-    if not results:
+    if results := self._RunQuery(query="", context=""):
+      self.assertDictEqual(results[0][0].ToDict(), test_plist_dict)
+    else:
       raise Exception("no results were found...")
-    self.assertDictEqual(results[0][0].ToDict(), test_plist_dict)
 
   def testActionSingleValueRetrieval(self):
-    results = self._RunQuery(query="", context="date")
-    if not results:
+    if results := self._RunQuery(query="", context="date"):
+      self.assertEqual(results[0][0], 978307200000000)
+    else:
       raise Exception("no results were found...")
-    self.assertEqual(results[0][0], 978307200000000)
 
   def testActionFilteredValueRetrieval(self):
     # Numbers does NOT contain a 2, but a "2", this should return nothing

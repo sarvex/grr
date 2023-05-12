@@ -76,15 +76,14 @@ class ClientReport(Report):
 
   def AsHtmlTable(self):
     """Return the results as an HTML table."""
-    th = ["<th>%s</th>" % f for f in self.fields]
-    headers = "<tr>%s</tr>" % "".join(th)
+    th = [f"<th>{f}</th>" for f in self.fields]
+    headers = f'<tr>{"".join(th)}</tr>'
     rows = []
     for val in self.results:
       values = [val[k] for k in self.fields]
-      row = ["<td>%s</td>" % f for f in values]
-      rows.append("<tr>%s</tr>" % "".join(row))
-    html_out = "<table>%s%s</table>" % (headers, "\n".join(rows))
-    return html_out
+      row = [f"<td>{f}</td>" for f in values]
+      rows.append(f'<tr>{"".join(row)}</tr>')
+    return "<table>%s%s</table>" % (headers, "\n".join(rows))
 
   def AsText(self):
     """Give the report as formatted text."""
@@ -99,9 +98,9 @@ class ClientReport(Report):
   def MailReport(self, recipient, subject=None):
     """Mail the HTML report to recipient."""
     dt = rdfvalue.RDFDatetime().Now().Format("%Y-%m-%dT%H-%MZ")
-    subject = subject or "%s - %s" % (self.REPORT_NAME, dt)
+    subject = subject or f"{self.REPORT_NAME} - {dt}"
     csv_data = self.AsCsv()
-    filename = "%s-%s.csv" % (self.REPORT_NAME, dt)
+    filename = f"{self.REPORT_NAME}-{dt}.csv"
     email_alerts.SendEmail(recipient, self.EMAIL_FROM, subject,
                            "Please find the CSV report file attached",
                            attachments={filename: csv_data.getvalue()},
@@ -111,7 +110,7 @@ class ClientReport(Report):
   def MailHTMLReport(self, recipient, subject=None):
     """Mail the HTML report to recipient."""
     dt = rdfvalue.RDFDatetime().Now().Format("%Y-%m-%dT%H-%MZ")
-    subject = subject or "%s - %s" % (self.REPORT_NAME, dt)
+    subject = subject or f"{self.REPORT_NAME} - {dt}"
     report_text = self.AsHtmlTable()
 
     email_alerts.SendEmail(recipient, self.EMAIL_FROM, subject,
@@ -163,8 +162,7 @@ class ClientListReport(ClientReport):
     start_time = time.time()
     self.results = []
     self.broken_subjects = []
-    for client in self._QueryResults(max_age):
-      self.results.append(client)
+    self.results.extend(iter(self._QueryResults(max_age)))
     self.SortResults("GRR client")
     logging.info("%s took %s to complete", self.REPORT_NAME,
                  datetime.timedelta(seconds=time.time() - start_time))
@@ -189,8 +187,10 @@ class VersionBreakdownReport(ClientReport):
         counts[version] += 1
       except KeyError:
         counts[version] = 1
-    for version, count in counts.iteritems():
-      self.results.append({"GRR client": version, "count": count})
+    self.results.extend({
+        "GRR client": version,
+        "count": count
+    } for version, count in counts.iteritems())
     self.SortResults("count")
 
 
@@ -223,8 +223,7 @@ class ClientReportIterator(export_utils.IterateAllClients):
           result[attr.name] = None
           continue
 
-        result[attr.name] = "%s %s" % (c_info.client_name,
-                                       str(c_info.client_version))
+        result[attr.name] = f"{c_info.client_name} {str(c_info.client_version)}"
       else:
         result[attr.name] = client.Get(attr)
 
@@ -237,8 +236,7 @@ class ClientReportIterator(export_utils.IterateAllClients):
         continue
       # Special case formatting for some attributes.
       if attr.name == "Interfaces":
-        interfaces = client_sub.Get(attr)
-        if interfaces:
+        if interfaces := client_sub.Get(attr):
           try:
             result[attr.name] = ",".join(interfaces.GetIPAddresses())
           except AttributeError:
@@ -257,4 +255,4 @@ class ReportName(rdfvalue.RDFString):
   def ParseFromString(self, value):
     super(ReportName, self).ParseFromString(value)
     if value not in Report.classes:
-      raise ValueError("Invalid report %s." % value)
+      raise ValueError(f"Invalid report {value}.")

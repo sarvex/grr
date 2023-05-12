@@ -52,22 +52,21 @@ def Execute(cmd, args, time_limit=-1, bypass_whitelist=False, daemon=False):
                  " ".join(args))
     return ("", "Execution disallowed by whitelist.", -1, -1)
 
-  if daemon:
-    pid = os.fork()
-    if pid == 0:
-      # This is the child, it will run the daemon process. We call os.setsid
-      # here to become the session leader of this new session and the process
-      # group leader of the new process group so we don't get killed when the
-      # main process exits.
-      try:
-        os.setsid()
-      except OSError:
-        # This only works if the process is running as root.
-        pass
-      _Execute(cmd, args, time_limit)
-      os._exit(0)  # pylint: disable=protected-access
-  else:
+  if not daemon:
     return _Execute(cmd, args, time_limit)
+  pid = os.fork()
+  if pid == 0:
+    # This is the child, it will run the daemon process. We call os.setsid
+    # here to become the session leader of this new session and the process
+    # group leader of the new process group so we don't get killed when the
+    # main process exits.
+    try:
+      os.setsid()
+    except OSError:
+      # This only works if the process is running as root.
+      pass
+    _Execute(cmd, args, time_limit)
+    os._exit(0)  # pylint: disable=protected-access
 
 
 def _Execute(cmd, args, time_limit=-1):
@@ -154,11 +153,8 @@ def IsExecutionWhitelisted(cmd, args):
   else:
     whitelist = []
 
-  for (allowed_cmd, allowed_args) in whitelist:
-    if cmd == allowed_cmd and args == allowed_args:
-      return True
-
-  return False
+  return any(cmd == allowed_cmd and args == allowed_args
+             for allowed_cmd, allowed_args in whitelist)
 
 
 LOG_THROTTLE_CACHE = utils.TimeBasedCache(max_size=10, max_age=60 * 60)

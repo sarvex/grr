@@ -33,9 +33,7 @@ def RetrieveIPInfo(ip):
   if not ip:
     return (IPInfo.UNKNOWN, "No ip information.")
   ip = SmartStr(ip)
-  if ":" in ip:
-    return RetrieveIP6Info(ip)
-  return RetrieveIP4Info(ip)
+  return RetrieveIP6Info(ip) if ":" in ip else RetrieveIP4Info(ip)
 
 def RetrieveIP4Info(ip):
   """Retrieves information for an IP4 address."""
@@ -137,7 +135,7 @@ class Node(object):
     self.key = key
 
   def __str__(self):
-    return "Node %s: %s" % (self.key, SmartStr(self.data))
+    return f"Node {self.key}: {SmartStr(self.data)}"
 
   def __repr__(self):
     return SmartStr(self)
@@ -271,8 +269,7 @@ class FastStore(object):
   @Synchronized
   def ExpireObject(self, key):
     """Expire a specific object from cache."""
-    node = self._hash.pop(key, None)
-    if node:
+    if node := self._hash.pop(key, None):
       self._age.Unlink(node)
       self.KillObject(node.data)
 
@@ -296,9 +293,7 @@ class FastStore(object):
   @Synchronized
   def Pop(self, key):
     """Remove the object from the cache completely."""
-    node = self._hash.get(key)
-
-    if node:
+    if node := self._hash.get(key):
       self._age.Unlink(node)
 
       return node.data
@@ -344,7 +339,7 @@ class FastStore(object):
       node = self._age.PopLeft()
       self.KillObject(node.data)
 
-    self._hash = dict()
+    self._hash = {}
 
   @Synchronized
   def __getstate__(self):
@@ -488,10 +483,8 @@ class Struct(object):
 
   def __repr__(self):
     """Produce useful text representation of the Struct."""
-    dat = []
-    for _, name in self._fields:
-      dat.append("%s=%s" % (name, getattr(self, name)))
-    return "%s(%s)" % (self.__class__.__name__, ", ".join(dat))
+    dat = [f"{name}={getattr(self, name)}" for _, name in self._fields]
+    return f'{self.__class__.__name__}({", ".join(dat)})'
 
   @classmethod
   def GetSize(cls):
@@ -585,7 +578,7 @@ def FormatAsHexString(num, width=None, prefix="0x"):
   hex_str = hex_str.replace("L", "")
   if width:
     hex_str = hex_str.rjust(width, "0")
-  return "%s%s" % (prefix, hex_str)
+  return f"{prefix}{hex_str}"
 
 
 def FormatAsTimestamp(timestamp):
@@ -696,10 +689,7 @@ def GuessWindowsFileNameFromString(str_in):
     guesses = [shlex.split(str_in)[0]]
   else:
     for component in str_in.split(" "):
-      if current_str:
-        current_str = " ".join((current_str, component))
-      else:
-        current_str = component
+      current_str = " ".join((current_str, component)) if current_str else component
       guesses.append(current_str)
 
   return guesses
@@ -759,9 +749,9 @@ def EscapeRegex(string):
 
 def GeneratePassphrase(length=20):
   """Create a 20 char passphrase with easily typeable chars."""
-  valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  valid_chars += "0123456789 ,-_&$#"
-  return "".join(random.choice(valid_chars) for i in range(length))
+  valid_chars = ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+                 "0123456789 ,-_&$#")
+  return "".join(random.choice(valid_chars) for _ in range(length))
 
 
 class PRNG(object):
@@ -1148,7 +1138,7 @@ class DataObject(dict):
 
   def Register(self, item, value=None):
     if item in self:
-      raise AttributeError("Item %s already registered." % item)
+      raise AttributeError(f"Item {item} already registered.")
 
     self[item] = value
 
@@ -1167,7 +1157,7 @@ class DataObject(dict):
   def __str__(self):
     result = []
     for k, v in self.items():
-      tmp = "  %s = " % k
+      tmp = f"  {k} = "
       try:
         for line in SmartUnicode(v).splitlines():
           tmp += "    %s\n" % line

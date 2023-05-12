@@ -2,6 +2,7 @@
 """URL definitions for GRR Admin Server."""
 
 
+
 import mimetypes
 import os
 
@@ -17,19 +18,19 @@ help_root = os.path.join(os.path.dirname(os.path.dirname(gui.__file__)), "docs")
 django_base = "django."
 view_base = "grr.gui.views."
 handler404 = "urls.handler404"
-handler500 = view_base + "ServerError"
-static_handler = django_base + "views.static.serve"
+handler500 = f"{view_base}ServerError"
+static_handler = f"{django_base}views.static.serve"
 
 urlpatterns = urls.patterns(
     "",
-    (r"^$", view_base + "Homepage"),
-    # Automatic rendering is done here
-    (r"^api/.+", view_base + "RenderApi"),
-    (r"^render/[^/]+/.*", view_base + "RenderGenericRenderer"),
-    (r"^download/[^/]+/.*", view_base + "RenderBinaryDownload"),
-    (r"^static/(.*)$", static_handler,
-     {"document_root": document_root}),
-    (r"^help/(.*)$", view_base + "RenderHelp")
+    (r"^$", f"{view_base}Homepage"),
+    (r"^api/.+", f"{view_base}RenderApi"),
+    (r"^render/[^/]+/.*", f"{view_base}RenderGenericRenderer"),
+    (r"^download/[^/]+/.*", f"{view_base}RenderBinaryDownload"),
+    (r"^static/(.*)$", static_handler, {
+        "document_root": document_root
+    }),
+    (r"^help/(.*)$", f"{view_base}RenderHelp"),
 )
 
 

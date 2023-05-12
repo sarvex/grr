@@ -118,8 +118,7 @@ class TestDebugClientRequestsView(TestInspectViewBase):
 
     # Check that the we can see the requests in the table.
     for request in "GetPlatformInfo GetConfig EnumerateInterfaces".split():
-      self.assertTrue(self.IsElementPresent(
-          "css=td:contains(%s)" % request))
+      self.assertTrue(self.IsElementPresent(f"css=td:contains({request})"))
 
     self.Click("css=td:contains(GetPlatformInfo)")
 

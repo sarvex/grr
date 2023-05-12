@@ -365,11 +365,9 @@ class TestPackedVersionedCollection(test_lib.AFF4ObjectTest):
 
   def _testCompactsCollectionSuccessfully(self, num_elements):
     with aff4.FACTORY.Create(self.collection_urn,
-                             "PackedVersionedCollection",
-                             mode="w", token=self.token) as fd:
-      elements = []
-      for i in range(num_elements):
-        elements.append(rdfvalue.GrrMessage(request_id=i))
+                               "PackedVersionedCollection",
+                               mode="w", token=self.token) as fd:
+      elements = [rdfvalue.GrrMessage(request_id=i) for i in range(num_elements)]
       fd.AddAll(elements)
 
     # Check that items are stored in the versions.
@@ -521,11 +519,9 @@ class TestPackedVersionedCollection(test_lib.AFF4ObjectTest):
 
   def testExtendsLeaseIfCompactionTakesTooLong(self):
     with aff4.FACTORY.Create(self.collection_urn,
-                             "PackedVersionedCollection",
-                             mode="w", token=self.token) as fd:
-      elements = []
-      for i in range(10):
-        elements.append(rdfvalue.GrrMessage(request_id=i))
+                               "PackedVersionedCollection",
+                               mode="w", token=self.token) as fd:
+      elements = [rdfvalue.GrrMessage(request_id=i) for i in range(10)]
       fd.AddAll(elements)
 
     config_lib.CONFIG.Set("Worker.compaction_lease_time", 42)
@@ -633,11 +629,9 @@ class TestPackedVersionedCollection(test_lib.AFF4ObjectTest):
     self._EnableJournaling()
 
     with aff4.FACTORY.Create(self.collection_urn,
-                             "PackedVersionedCollection",
-                             mode="w", token=self.token) as fd:
-      elements = []
-      for i in range(10):
-        elements.append(rdfvalue.GrrMessage(request_id=i))
+                               "PackedVersionedCollection",
+                               mode="w", token=self.token) as fd:
+      elements = [rdfvalue.GrrMessage(request_id=i) for i in range(10)]
       fd.AddAll(elements)
 
     fd = aff4.FACTORY.Open(self.collection_urn, age=aff4.ALL_TIMES,
@@ -651,11 +645,9 @@ class TestPackedVersionedCollection(test_lib.AFF4ObjectTest):
     self._EnableJournaling()
 
     with aff4.FACTORY.Create(self.collection_urn,
-                             "PackedVersionedCollection",
-                             mode="w", token=self.token) as fd:
-      elements = []
-      for i in range(10):
-        elements.append(rdfvalue.GrrMessage(request_id=i))
+                               "PackedVersionedCollection",
+                               mode="w", token=self.token) as fd:
+      elements = [rdfvalue.GrrMessage(request_id=i) for i in range(10)]
       fd.AddAll(elements)
       fd.AddAll(elements[:5])
 
@@ -671,10 +663,7 @@ class TestPackedVersionedCollection(test_lib.AFF4ObjectTest):
   def testTwoJournalEntriesAreAddedAfterTwoAddAllCallsSeparatedByFlush(self):
     self._EnableJournaling()
 
-    elements = []
-    for i in range(10):
-      elements.append(rdfvalue.GrrMessage(request_id=i))
-
+    elements = [rdfvalue.GrrMessage(request_id=i) for i in range(10)]
     with aff4.FACTORY.Create(self.collection_urn,
                              "PackedVersionedCollection",
                              mode="w", token=self.token) as fd:

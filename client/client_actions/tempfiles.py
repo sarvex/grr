@@ -78,7 +78,7 @@ def CreateGRRTempFile(directory=None, filename=None, lifetime=0, mode="w+b",
     directory = config_lib.CONFIG["Client.tempdir"]
 
   if not os.path.isabs(directory):
-    raise ErrorBadPath("Directory %s is not absolute" % directory)
+    raise ErrorBadPath(f"Directory {directory} is not absolute")
 
   if not os.path.isdir(directory):
     os.makedirs(directory)
@@ -96,7 +96,7 @@ def CreateGRRTempFile(directory=None, filename=None, lifetime=0, mode="w+b",
                                           dir=directory, delete=False)
   else:
     if suffix:
-      filename = "%s.%s" % (filename, suffix)
+      filename = f"{filename}.{suffix}"
 
     outfile = open(os.path.join(directory, filename), mode)
 
@@ -190,9 +190,9 @@ class DeleteGRRTempFiles(actions.ActionPlugin):
       deleted = [path]
 
     elif not os.path.exists(path):
-      raise ErrorBadPath("File %s does not exist" % path)
+      raise ErrorBadPath(f"File {path} does not exist")
     else:
-      raise ErrorBadPath("Not a regular file or directory: %s" % path)
+      raise ErrorBadPath(f"Not a regular file or directory: {path}")
 
-    out_rdfvalue = rdfvalue.LogMessage(data="Deleted: %s" % deleted)
+    out_rdfvalue = rdfvalue.LogMessage(data=f"Deleted: {deleted}")
     self.SendReply(out_rdfvalue)

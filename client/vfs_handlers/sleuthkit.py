@@ -156,15 +156,12 @@ class TSKFile(vfs.VFSHandler):
       self.pathspec.last.inode = self.fd.info.meta.addr
 
   def GetAttribute(self, ntfs_type, ntfs_id):
-    for attribute in self.fd:
-      if attribute.info.type == ntfs_type:
-        # If ntfs_id is specified it has to also match.
-        if ntfs_id != 0 and attribute.info.id != ntfs_id:
-          continue
-
-        return attribute
-
-    return None
+    return next(
+        (attribute
+         for attribute in self.fd if attribute.info.type == ntfs_type and (
+             ntfs_id == 0 or attribute.info.id == ntfs_id)),
+        None,
+    )
 
   def ListNames(self):
     directory_handle = self.fd.as_directory()
@@ -212,11 +209,10 @@ class TSKFile(vfs.VFSHandler):
           value = int(getattr(meta, attribute))
           if value < 0: value &= 0xFFFFFFFF
 
-          setattr(response, "st_%s" % attribute, value)
+          setattr(response, f"st_{attribute}", value)
         except AttributeError:
           pass
 
-    name = info.name
     child_pathspec = self.pathspec.Copy()
 
     if append_name:
@@ -233,7 +229,7 @@ class TSKFile(vfs.VFSHandler):
       # Update the size with the attribute size.
       response.st_size = tsk_attribute.info.size
 
-    if name:
+    if name := info.name:
       # Encode the type onto the st_mode response
       response.st_mode |= self.FILE_TYPE_LOOKUP.get(int(name.type), 0)
 
@@ -248,7 +244,7 @@ class TSKFile(vfs.VFSHandler):
   def Read(self, length):
     """Read from the file."""
     if not self.IsFile():
-      raise IOError("%s is not a file." % self.pathspec.last.path)
+      raise IOError(f"{self.pathspec.last.path} is not a file.")
 
     available = min(self.size - self.offset, length)
     if available > 0:
@@ -271,29 +267,29 @@ class TSKFile(vfs.VFSHandler):
 
   def ListFiles(self):
     """List all the files in the directory."""
-    if self.IsDirectory():
-      dir_fd = self.fd.as_directory()
-      for f in dir_fd:
-        try:
-          name = f.info.name.name
-          # Drop these useless entries.
-          if name in [".", ".."] or name in self.BLACKLIST_FILES:
-            continue
+    if not self.IsDirectory():
+      raise IOError(f"{self.pathspec.CollapsePath()} is not a directory")
+    dir_fd = self.fd.as_directory()
+    for f in dir_fd:
+      try:
+        name = f.info.name.name
+        # Drop these useless entries.
+        if name in [".", ".."] or name in self.BLACKLIST_FILES:
+          continue
 
-          # First we yield a standard response using the default attributes.
-          yield self.MakeStatResponse(f, tsk_attribute=None, append_name=name)
+        # First we yield a standard response using the default attributes.
+        yield self.MakeStatResponse(f, tsk_attribute=None, append_name=name)
 
           # Now send back additional named attributes for the ADS.
-          for attribute in f:
-            if attribute.info.type in [pytsk3.TSK_FS_ATTR_TYPE_NTFS_DATA,
-                                       pytsk3.TSK_FS_ATTR_TYPE_DEFAULT]:
-              if attribute.info.name:
-                yield self.MakeStatResponse(f, append_name=name,
-                                            tsk_attribute=attribute)
-        except AttributeError:
-          pass
-    else:
-      raise IOError("%s is not a directory" % self.pathspec.CollapsePath())
+        for attribute in f:
+          if (attribute.info.type in [
+              pytsk3.TSK_FS_ATTR_TYPE_NTFS_DATA,
+              pytsk3.TSK_FS_ATTR_TYPE_DEFAULT,
+          ] and attribute.info.name):
+            yield self.MakeStatResponse(f, append_name=name,
+                                        tsk_attribute=attribute)
+      except AttributeError:
+        pass
 
   def IsDirectory(self):
     return self.fd.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR

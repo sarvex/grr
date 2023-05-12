@@ -187,7 +187,7 @@ class TestFlowManagement(test_lib.GRRSeleniumTest):
                              client_id=client_id, sync=False, token=self.token)
       self.GrantClientApproval(client_id)
 
-    self.Open("/#c=" + client_id)
+    self.Open(f"/#c={client_id}")
     self.Click("css=a:contains('Manage launched flows')")
     self.Click("css=td:contains('FlowWithOneStatEntryResult')")
     self.Click("css=#Results")

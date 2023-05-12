@@ -95,12 +95,12 @@ class Factory(object):
 
       return (int(start), int(end))
 
-    raise RuntimeError("Unknown age specification: %s" % age)
+    raise RuntimeError(f"Unknown age specification: {age}")
 
   def GetAttributes(self, urns, ignore_cache=False, token=None,
                     age=NEWEST_TIME):
     """Retrieves all the attributes for all the urns."""
-    urns = set([utils.SmartUnicode(u) for u in urns])
+    urns = {utils.SmartUnicode(u) for u in urns}
     if not ignore_cache:
       for subject in list(urns):
         key = self._MakeCacheInvariant(subject, token, age)
@@ -132,7 +132,7 @@ class Factory(object):
     try:
       # Expire all entries in the cache for this urn (for all tokens, and
       # timestamps)
-      self.cache.ExpirePrefix(utils.SmartStr(urn) + ":")
+      self.cache.ExpirePrefix(f"{utils.SmartStr(urn)}:")
     except KeyError:
       pass
 
@@ -191,14 +191,17 @@ class Factory(object):
           self.intermediate_cache.Get(urn.Path())
           return
         except KeyError:
-          data_store.DB.MultiSet(dirname, {
-              AFF4Object.SchemaCls.LAST: [
-                  rdfvalue.RDFDatetime().Now().SerializeToDataStore()],
-
-              # This updates the directory index.
-              "index:dir/%s" % utils.SmartStr(basename): [EMPTY_DATA],
-          },
-                                 token=token, replace=True, sync=False)
+          data_store.DB.MultiSet(
+              dirname,
+              {
+                  AFF4Object.SchemaCls.LAST:
+                  [rdfvalue.RDFDatetime().Now().SerializeToDataStore()],
+                  f"index:dir/{utils.SmartStr(basename)}": [EMPTY_DATA],
+              },
+              token=token,
+              replace=True,
+              sync=False,
+          )
 
           self.intermediate_cache.Put(urn.Path(), 1)
 
@@ -219,8 +222,11 @@ class Factory(object):
         pass
 
       data_store.DB.DeleteAttributes(
-          dirname, ["index:dir/%s" % utils.SmartStr(basename)], token=token,
-          sync=False)
+          dirname,
+          [f"index:dir/{utils.SmartStr(basename)}"],
+          token=token,
+          sync=False,
+      )
       data_store.DB.MultiSet(dirname, {
           AFF4Object.SchemaCls.LAST: [
               rdfvalue.RDFDatetime().Now().SerializeToDataStore()],
@@ -262,8 +268,7 @@ class Factory(object):
     Returns:
        A key into the cache.
     """
-    return "%s:%s:%s" % (utils.SmartStr(urn), utils.SmartStr(token),
-                         self.ParseAgeSpecification(age))
+    return f"{utils.SmartStr(urn)}:{utils.SmartStr(token)}:{self.ParseAgeSpecification(age)}"
 
   def CreateWithLock(self, urn, aff4_type, token=None, age=NEWEST_TIME,
                      ignore_cache=False, force_new_version=True,
@@ -459,7 +464,7 @@ class Factory(object):
       AttributeError: If the requested mode is incorrect.
     """
     if mode not in ["w", "r", "rw"]:
-      raise AttributeError("Invalid mode %s" % mode)
+      raise AttributeError(f"Invalid mode {mode}")
 
     if mode == "w":
       if aff4_type is None:
@@ -489,17 +494,14 @@ class Factory(object):
                         age=age, follow_symlinks=follow_symlinks,
                         aff4_type=aff4_type)
 
-    # Now we have a AFF4Object, turn it into the type it is currently supposed
-    # to be as specified by Schema.TYPE.
-    existing_type = result.Get(result.Schema.TYPE, default="AFF4Volume")
-    if existing_type:
+    if existing_type := result.Get(result.Schema.TYPE, default="AFF4Volume"):
       result = result.Upgrade(existing_type)
 
     if (aff4_type is not None and
         not isinstance(result, AFF4Object.classes[aff4_type])):
       raise InstantiationError(
-          "Object %s is of type %s, but required_type is %s" % (
-              urn, result.__class__.__name__, aff4_type))
+          f"Object {urn} is of type {result.__class__.__name__}, but required_type is {aff4_type}"
+      )
 
     return result
 
@@ -510,7 +512,7 @@ class Factory(object):
       token = data_store.default_token
 
     if mode not in ["w", "r", "rw"]:
-      raise RuntimeError("Invalid mode %s" % mode)
+      raise RuntimeError(f"Invalid mode {mode}")
 
     self.aff4_type = aff4_type
 
@@ -530,9 +532,14 @@ class Factory(object):
         pass
 
     if symlinks:
-      for obj in self.MultiOpen(symlinks, mode=mode, ignore_cache=ignore_cache,
-                                token=token, aff4_type=aff4_type, age=age):
-        yield obj
+      yield from self.MultiOpen(
+          symlinks,
+          mode=mode,
+          ignore_cache=ignore_cache,
+          token=token,
+          aff4_type=aff4_type,
+          age=age,
+      )
 
   def OpenDiscreteVersions(self, urn, mode="r", ignore_cache=False, token=None,
                            local_cache=None, age=ALL_TIMES,
@@ -568,10 +575,7 @@ class Factory(object):
     """
     if age == NEWEST_TIME or len(age) == 1:
       raise IOError("Bad age policy NEWEST_TIME for OpenDiscreteVersions.")
-    if len(age) == 2:
-      oldest_age = age[1]
-    else:
-      oldest_age = 0
+    oldest_age = age[1] if len(age) == 2 else 0
     aff4object = FACTORY.Open(urn, mode=mode, ignore_cache=ignore_cache,
                               token=token, local_cache=local_cache, age=age,
                               follow_symlinks=follow_symlinks)
@@ -588,10 +592,9 @@ class Factory(object):
       # this version.
       clone_attrs = {}
       for k, values in aff4object.synced_attributes.iteritems():
-        reduced_v = []
-        for v in values:
-          if v.age > age_range[0] and v.age <= age_range[1]:
-            reduced_v.append(v)
+        reduced_v = [
+            v for v in values if v.age > age_range[0] and v.age <= age_range[1]
+        ]
         clone_attrs.setdefault(k, []).extend(reduced_v)
 
       obj_cls = AFF4Object.classes[version_list[i][1]]
@@ -650,7 +653,7 @@ class Factory(object):
       AttributeError: If the mode is invalid.
     """
     if mode not in ["w", "r", "rw"]:
-      raise AttributeError("Invalid mode %s" % mode)
+      raise AttributeError(f"Invalid mode {mode}")
 
     if token is None:
       token = data_store.default_token
@@ -708,7 +711,7 @@ class Factory(object):
 
     urn = rdfvalue.RDFURN(urn)
     if len(urn.Path()) < 1:
-      raise RuntimeError("URN %s too short. Please enter a valid URN" % urn)
+      raise RuntimeError(f"URN {urn} too short. Please enter a valid URN")
 
     # Get all the children (not only immediate ones, but the whole subtree)
     # from the index.
@@ -805,10 +808,7 @@ class Factory(object):
        Tuples of Subjects and a list of children urns of a given subject.
     """
     index_prefix = "index:dir/"
-    for subject, values in data_store.DB.MultiResolveRegex(
-        urns, index_prefix + ".+", token=token,
-        timestamp=Factory.ParseAgeSpecification(age),
-        limit=limit):
+    for subject, values in data_store.DB.MultiResolveRegex(urns, f"{index_prefix}.+", token=token, timestamp=Factory.ParseAgeSpecification(age), limit=limit):
 
       subject_result = []
       for predicate, _, timestamp in values:
@@ -900,9 +900,7 @@ class Attribute(object):
       try:
         old_attribute = Attribute.PREDICATES[predicate]
         if old_attribute.attribute_type != attribute_type:
-          msg = "Attribute %s defined with conflicting types (%s, %s)" % (
-              predicate, old_attribute.attribute_type.__class__.__name__,
-              attribute_type.__class__.__name__)
+          msg = f"Attribute {predicate} defined with conflicting types ({old_attribute.attribute_type.__class__.__name__}, {attribute_type.__class__.__name__})"
           logging.error(msg)
           raise RuntimeError(msg)
       except KeyError:
@@ -942,7 +940,7 @@ class Attribute(object):
     return self.predicate
 
   def __repr__(self):
-    return "<Attribute(%s, %s)>" % (self.name, self.predicate)
+    return f"<Attribute({self.name}, {self.predicate})>"
 
   def __hash__(self):
     return hash(self.predicate)
@@ -975,7 +973,7 @@ class Attribute(object):
 
       return cls.NAMES[name]
     except KeyError:
-      raise AttributeError("Invalid attribute %s" % name)
+      raise AttributeError(f"Invalid attribute {name}")
 
   def GetRDFValueType(self):
     """Returns this attribute's RDFValue class."""
@@ -986,7 +984,7 @@ class Attribute(object):
         try:
           result = result.type_infos.get(field_name).type
         except AttributeError:
-          raise AttributeError("Invalid attribute %s" % field_name)
+          raise AttributeError(f"Invalid attribute {field_name}")
       else:
         # TODO(user): Remove and deprecate.
         # Support for the old RDFProto.
@@ -1021,11 +1019,9 @@ class Attribute(object):
 
     if isinstance(fd, rdfvalue.RDFValueArray):
       for value in fd:
-        for res in self._GetSubField(value, field_names):
-          yield res
+        yield from self._GetSubField(value, field_names)
     else:
-      for res in self._GetSubField(fd, field_names):
-        yield res
+      yield from self._GetSubField(fd, field_names)
 
   def GetValues(self, fd):
     """Return the values for this attribute as stored in an AFF4Object."""
@@ -1033,9 +1029,7 @@ class Attribute(object):
     for result in fd.new_attributes.get(self, []):
       # We need to interpolate sub fields in this rdfvalue.
       if self.field_names:
-        for x in self.GetSubFields(result, self.field_names):
-          yield x
-
+        yield from self.GetSubFields(result, self.field_names)
       else:
         yield result
 
@@ -1045,9 +1039,7 @@ class Attribute(object):
       # We need to interpolate sub fields in this rdfvalue.
       if result is not None:
         if self.field_names:
-          for x in self.GetSubFields(result, self.field_names):
-            yield x
-
+          yield from self.GetSubFields(result, self.field_names)
         else:
           yield result
 
@@ -1062,15 +1054,12 @@ class Attribute(object):
       return self.default(fd)
 
     if self.default is not None:
-      # We can't return mutable objects here or the default might change for all
-      # objects of this class.
-      if isinstance(self.default, rdfvalue.RDFValue):
-        default = self.default.Copy()
-        default.attribute_instance = self
-        return self(default)
-      else:
+      if not isinstance(self.default, rdfvalue.RDFValue):
         return self(self.default)
 
+      default = self.default.Copy()
+      default.attribute_instance = self
+      return self(default)
     if isinstance(default, rdfvalue.RDFValue):
       default = default.Copy()
       default.attribute_instance = self
@@ -1098,7 +1087,7 @@ class AFF4Attribute(rdfvalue.RDFString):
       Attribute.GetAttributeByName(self._value)
     except (AttributeError, KeyError):
       raise type_info.TypeValueError(
-          "Value %s is not an AFF4 attribute name" % self._value)
+          f"Value {self._value} is not an AFF4 attribute name")
 
 
 class ClassProperty(property):
@@ -1267,8 +1256,8 @@ class AFF4Object(object):
       """
       if self.aff4_type:
         raise BadGetAttributeError(
-            "Attribute does not exist on object opened with aff4_type %s" %
-            self.aff4_type)
+            f"Attribute does not exist on object opened with aff4_type {self.aff4_type}"
+        )
 
       return None
 
@@ -1310,22 +1299,7 @@ class AFF4Object(object):
     # are new attributes which still need to be flushed to the data_store. When
     # this object is instantiated we populate self.synced_attributes with the
     # data_store, while the finish method flushes new changes.
-    if clone is not None:
-      if isinstance(clone, dict):
-        # Just use these as the attributes, do not go to the data store. This is
-        # a quick way of creating an object with data which was already fetched.
-        self.new_attributes = {}
-        self.synced_attributes = clone
-
-      elif isinstance(clone, AFF4Object):
-        # We were given another object to clone - we do not need to access the
-        # data_store now.
-        self.new_attributes = clone.new_attributes.copy()
-        self.synced_attributes = clone.synced_attributes.copy()
-
-      else:
-        raise RuntimeError("Cannot clone from %s." % clone)
-    else:
+    if clone is None:
       self.new_attributes = {}
       self.synced_attributes = {}
 
@@ -1343,6 +1317,20 @@ class AFF4Object(object):
             for attribute_name, value, ts in values:
               self.DecodeValueFromAttribute(attribute_name, value, ts)
 
+    elif isinstance(clone, dict):
+      # Just use these as the attributes, do not go to the data store. This is
+      # a quick way of creating an object with data which was already fetched.
+      self.new_attributes = {}
+      self.synced_attributes = clone
+
+    elif isinstance(clone, AFF4Object):
+      # We were given another object to clone - we do not need to access the
+      # data_store now.
+      self.new_attributes = clone.new_attributes.copy()
+      self.synced_attributes = clone.synced_attributes.copy()
+
+    else:
+      raise RuntimeError(f"Cannot clone from {clone}.")
     if clone is None:
       self.Initialize()
 
@@ -1399,10 +1387,7 @@ class AFF4Object(object):
     Returns:
       int: seconds left in the lease, 0 if not locked or lease is expired
     """
-    if self.transaction:
-      return self.transaction.CheckLease()
-
-    return 0
+    return self.transaction.CheckLease() if self.transaction else 0
 
   def UpdateLease(self, duration):
     """Updates the lease and flushes the object.
@@ -1421,8 +1406,7 @@ class AFF4Object(object):
                  expired.
     """
     if not self.locked:
-      raise LockError(
-          "Object must be locked to update the lease: %s." % self.urn)
+      raise LockError(f"Object must be locked to update the lease: {self.urn}.")
 
     if self.CheckLease() == 0:
       raise LockError("Can not update lease that has already expired.")
@@ -1594,7 +1578,7 @@ class AFF4Object(object):
        IOError: If this object is read only.
     """
     if "w" not in self.mode:
-      raise IOError("Writing attribute %s to read only object." % attribute)
+      raise IOError(f"Writing attribute {attribute} to read only object.")
 
     if value is None:
       value = attribute
@@ -1603,7 +1587,7 @@ class AFF4Object(object):
     # Check if this object should be locked in order to add the attribute.
     # NOTE: We don't care about locking when doing blind writes.
     if self.mode != "w" and attribute.lock_protected and not self.transaction:
-      raise IOError("Object must be locked to write attribute %s." % attribute)
+      raise IOError(f"Object must be locked to write attribute {attribute}.")
 
     self._CheckAttribute(attribute, value)
 
@@ -1633,12 +1617,12 @@ class AFF4Object(object):
   def DeleteAttribute(self, attribute):
     """Clears the attribute from this object."""
     if "w" not in self.mode:
-      raise IOError("Deleting attribute %s from read only object." % attribute)
+      raise IOError(f"Deleting attribute {attribute} from read only object.")
 
     # Check if this object should be locked in order to delete the attribute.
     # NOTE: We don't care about locking when doing blind writes.
     if self.mode != "w" and attribute.lock_protected and not self.transaction:
-      raise IOError("Object must be locked to delete attribute %s." % attribute)
+      raise IOError(f"Object must be locked to delete attribute {attribute}.")
 
     if attribute in self.synced_attributes:
       self._to_delete.add(attribute)
@@ -1681,8 +1665,7 @@ class AFF4Object(object):
     # specified. It is ok to read new attributes though.
     if "r" not in self.mode and (attribute not in self.new_attributes and
                                  attribute not in self.synced_attributes):
-      raise IOError(
-          "Fetching %s from object not opened for reading." % attribute)
+      raise IOError(f"Fetching {attribute} from object not opened for reading.")
 
     for result in self.GetValuesForAttribute(attribute, only_one=True):
       try:
@@ -1750,7 +1733,7 @@ class AFF4Object(object):
     # Instantiate the right type
     cls = self.classes.get(str(aff4_class))
     if cls is None:
-      raise InstantiationError("Could not instantiate %s" % aff4_class)
+      raise InstantiationError(f"Could not instantiate {aff4_class}")
 
     # It's not allowed to downgrade the object
     if isinstance(self, cls):
@@ -1891,7 +1874,7 @@ class AttributeExpression(lexer.Expression):
     self.attribute = attribute
     self.attribute_obj = Attribute.GetAttributeByName(attribute)
     if self.attribute_obj is None:
-      raise lexer.ParseError("Attribute %s not defined" % attribute)
+      raise lexer.ParseError(f"Attribute {attribute} not defined")
 
   def SetOperator(self, operator):
     """Sets the operator for this expression."""
@@ -1905,8 +1888,8 @@ class AttributeExpression(lexer.Expression):
         operator, (0, None))
 
     if self.operator_method is None:
-      raise lexer.ParseError("Operator %s not defined on attribute '%s'" % (
-          operator, self.attribute))
+      raise lexer.ParseError(
+          f"Operator {operator} not defined on attribute '{self.attribute}'")
 
     self.operator_method = getattr(attribute_type, self.operator_method)
 
@@ -1979,21 +1962,15 @@ class AFF4Volume(AFF4Object):
       InstantiationError: If we are unable to open the member (e.g. it does not
         already exist.)
     """
-    if isinstance(path, rdfvalue.RDFURN):
-      child_urn = path
-    else:
-      child_urn = self.urn.Add(path)
-
+    child_urn = path if isinstance(path, rdfvalue.RDFURN) else self.urn.Add(path)
     # Read the row from the table.
     result = AFF4Object(child_urn, mode=mode, token=self.token)
 
-    # Get the correct type.
-    aff4_type = result.Get(result.Schema.TYPE)
-    if aff4_type:
+    if aff4_type := result.Get(result.Schema.TYPE):
       # Try to get the container.
       return result.Upgrade(aff4_type)
 
-    raise InstantiationError("Path %s not found" % path)
+    raise InstantiationError(f"Path {path} not found")
 
   def ListChildren(self, limit=1000000, age=NEWEST_TIME):
     """Yields RDFURNs of all the children of this object.
@@ -2008,9 +1985,7 @@ class AFF4Volume(AFF4Object):
     """
     # Just grab all the children from the index.
     index_prefix = "index:dir/"
-    for predicate, _, timestamp in data_store.DB.ResolveRegex(
-        self.urn, index_prefix + ".+", token=self.token,
-        timestamp=Factory.ParseAgeSpecification(age), limit=limit):
+    for predicate, _, timestamp in data_store.DB.ResolveRegex(self.urn, f"{index_prefix}.+", token=self.token, timestamp=Factory.ParseAgeSpecification(age), limit=limit):
       urn = self.urn.Add(predicate[len(index_prefix):])
       urn.age = rdfvalue.RDFDatetime(timestamp)
       yield urn
@@ -2043,9 +2018,7 @@ class AFF4Volume(AFF4Object):
     while subjects:
       to_read = subjects[:chunk_limit]
       subjects = subjects[chunk_limit:]
-      for child in FACTORY.MultiOpen(to_read, mode=mode, token=self.token,
-                                     age=age):
-        yield child
+      yield from FACTORY.MultiOpen(to_read, mode=mode, token=self.token, age=age)
 
   @property
   def real_pathspec(self):
@@ -2069,15 +2042,14 @@ class AFF4Volume(AFF4Object):
       pathspec = parent.Get(parent.Schema.PATHSPEC)
       parent = FACTORY.Open(parent.urn.Dirname(), token=self.token)
 
-    if pathspec:
-      if stripped_components:
-        # We stripped pieces of the URL, time to add them back.
-        new_path = utils.JoinPath(*reversed(stripped_components[:-1]))
-        pathspec.Append(rdfvalue.PathSpec(path=new_path,
-                                          pathtype=pathspec.last.pathtype))
-    else:
+    if not pathspec:
       raise IOError("Item has no pathspec.")
 
+    if stripped_components:
+      # We stripped pieces of the URL, time to add them back.
+      new_path = utils.JoinPath(*reversed(stripped_components[:-1]))
+      pathspec.Append(rdfvalue.PathSpec(path=new_path,
+                                        pathtype=pathspec.last.pathtype))
     return pathspec
 
 
@@ -2100,9 +2072,7 @@ class AFF4Root(AFF4Volume):
     subjects = []
     result_set = data_store.DB.Query([], filter_obj, subjects=subjects,
                                      limit=limit, token=self.token)
-    for match in result_set:
-      subjects.append(match["subject"][0][0])
-
+    subjects.extend(match["subject"][0][0] for match in result_set)
     # Open them all at once.
     result = data_store.ResultSet(FACTORY.MultiOpen(subjects, token=self.token))
     result.total_count = result_set.total_count
@@ -2405,10 +2375,8 @@ class AFF4ImageBase(AFF4Stream):
     # is opened in "w" mode we can not read from the data store and therefore we
     # can not merge writes with existing data. It only makes sense to append to
     # existing streams.
-    if self.mode == "w":
-      # Seeking to the end of the stream is ok.
-      if not (whence == 2 and offset == 0):
-        raise IOError("Can not seek with an AFF4Image opened for write only.")
+    if self.mode == "w" and (whence != 2 or offset != 0):
+      raise IOError("Can not seek with an AFF4Image opened for write only.")
 
     if whence == 0:
       self.offset = offset
@@ -2463,7 +2431,7 @@ class AFF4ImageBase(AFF4Stream):
       try:
         fd = self.chunk_cache.Get(chunk_name)
       except KeyError:
-        raise ChunkNotFoundError("Cannot open chunk %s" % chunk_name)
+        raise ChunkNotFoundError(f"Cannot open chunk {chunk_name}")
 
     return fd
 

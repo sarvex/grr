@@ -61,15 +61,11 @@ def UpdateVFSFileAndWait(client_id, vfs_file_urn, token=None,
   update_flow_obj = aff4.FACTORY.Open(update_flow_urn, token=token,
                                       aff4_type="GRRFlow")
 
-  # Get the child flow so we can wait for it too.
-  sub_flow_urn = update_flow_obj.state.get_file_flow_urn
-
-  # If there was no subflow, no need to wait for it.
-  if not sub_flow_urn:
+  if sub_flow_urn := update_flow_obj.state.get_file_flow_urn:
+    WaitForFlow(sub_flow_urn, token=token,
+                timeout=timeout)
+  else:
     return
-
-  WaitForFlow(sub_flow_urn, token=token,
-              timeout=timeout)
 
 
 def WaitForFlow(flow_urn, token=None, timeout=DEFAULT_TIMEOUT, max_sleep_time=1,
@@ -162,20 +158,17 @@ def InterpolatePath(path, client, users=None, path_args=None, depth=0):
 
   # Override any system formatters with path_args.
   if path_args:
-    sys_formatters.update(path_args)
+    sys_formatters |= path_args
 
   if users:
     results = []
     for user in users:
-      # Extract and interpolate user specific formatters.
-      user = GetUserInfo(client, user)
-      if user:
-        formatters = dict((x.name, y) for x, y in user.ListFields())
-        special_folders = dict(
-            (x.name, y) for x, y in user.special_folders.ListFields())
+      if user := GetUserInfo(client, user):
+        formatters = {x.name: y for x, y in user.ListFields()}
+        special_folders = {x.name: y for x, y in user.special_folders.ListFields()}
 
-        formatters.update(special_folders)
-        formatters.update(sys_formatters)
+        formatters |= special_folders
+        formatters |= sys_formatters
         try:
           results.append(path.format(**formatters))
         except KeyError:

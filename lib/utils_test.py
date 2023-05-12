@@ -25,10 +25,7 @@ class StoreTests(test_lib.GRRBaseTest):
   def test01StoreExpiration(self):
     """Testing store removes objects when full."""
     s = utils.FastStore(max_size=5)
-    keys = []
-    for i in range(0, 100):
-      keys.append(s.Put(i, i))
-
+    keys = [s.Put(i, i) for i in range(0, 100)]
     # This should not raise
     s.Get(keys[-1])
 
@@ -38,10 +35,7 @@ class StoreTests(test_lib.GRRBaseTest):
   def test02StoreRefresh(self):
     """Test that store keeps recently gotten objects fresh."""
     s = utils.FastStore(max_size=5)
-    keys = []
-    for i in range(0, 5):
-      keys.append(s.Put(i, i))
-
+    keys = [s.Put(i, i) for i in range(0, 5)]
     # This should not raise because keys[0] should be refreshed each time its
     # gotten
     for i in range(0, 1000):

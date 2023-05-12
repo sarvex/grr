@@ -106,8 +106,7 @@ class FileStore(aff4.AFF4Volume):
     """
     files_for_write = []
     for sub_store in self.GetChildrenByPriority(allow_external=external):
-      new_file = sub_store.AddFile(fd, sync=sync)
-      if new_file:
+      if new_file := sub_store.AddFile(fd, sync=sync):
         files_for_write.append(new_file)
 
     fd.Seek(0)
@@ -138,8 +137,7 @@ class FileStore(aff4.AFF4Volume):
     """
     return_list = []
     for sub_store in self.GetChildrenByPriority(allow_external=external):
-      found = sub_store.FindFile(fd)
-      if found:
+      if found := sub_store.FindFile(fd):
         if isinstance(found, list):
           return_list.extend(found)
         else:
@@ -182,7 +180,7 @@ class FileStoreImage(aff4.VFSBlobImage):
     """Adds an indexed reference to the target URN."""
     if "w" not in self.mode:
       raise IOError("FileStoreImage %s is not in write mode.", self.urn)
-    predicate = ("index:target:%s" % target).lower()
+    predicate = f"index:target:{target}".lower()
     data_store.DB.MultiSet(self.urn, {predicate: target}, token=self.token,
                            replace=True, sync=False)
 
@@ -200,7 +198,7 @@ class FileStoreImage(aff4.VFSBlobImage):
       index.
     """
     # Make the regular expression.
-    regex = ["index:target:%s" % target_regex.lower()]
+    regex = [f"index:target:{target_regex.lower()}"]
     if isinstance(limit, (tuple, list)):
       start, length = limit  # pylint: disable=unpacking-non-sequence
 
@@ -295,7 +293,7 @@ class HashFileStore(FileStore):
       for fingerprint_type, hash_types in self.HASH_TYPES.iteritems():
         for hash_type in hash_types:
           if fingerprint_type == "pecoff":
-            hash_type = "pecoff_%s" % hash_type
+            hash_type = f"pecoff_{hash_type}"
           if not hashes.HasField(hash_type):
             found_all = False
             break
@@ -309,8 +307,7 @@ class HashFileStore(FileStore):
       hashers = self._GetHashers(self.HASH_TYPES["generic"])
       fingerprinter.EvalGeneric(hashers=hashers)
     if "pecoff" in self.HASH_TYPES:
-      hashers = self._GetHashers(self.HASH_TYPES["pecoff"])
-      if hashers:
+      if hashers := self._GetHashers(self.HASH_TYPES["pecoff"]):
         fingerprinter.EvalPecoff(hashers=hashers)
 
     if not hashes:
@@ -335,7 +332,7 @@ class HashFileStore(FileStore):
           hashes.Set(hash_type, result[hash_type])
 
         elif fingerprint_type == "pecoff":
-          hashes.Set("pecoff_%s" % hash_type, result[hash_type])
+          hashes.Set(f"pecoff_{hash_type}", result[hash_type])
 
         else:
           logging.error("Unknown fingerprint_type %s.", fingerprint_type)
@@ -478,9 +475,9 @@ class HashFileStore(FileStore):
 
     urns = []
     for fingerprint_type, hash_types in HashFileStore.HASH_TYPES.iteritems():
-      for hash_type in hash_types:
-        urns.append(HashFileStore.PATH.Add(fingerprint_type).Add(hash_type))
-
+      urns.extend(
+          HashFileStore.PATH.Add(fingerprint_type).Add(hash_type)
+          for hash_type in hash_types)
     for _, values in aff4.FACTORY.MultiListChildren(urns, token=token, age=age):
       for value in values:
         yield rdfvalue.FileStoreHash(value)
@@ -511,8 +508,7 @@ class HashFileStore(FileStore):
 
     results = cls.GetClientsForHashes([hash_obj], token=token, age=age)
     for _, client_files in results:
-      for client_file in client_files:
-        yield client_file
+      yield from client_files
 
   @classmethod
   def GetClientsForHashes(cls, hashes, token=None, age=aff4.NEWEST_TIME):

@@ -22,8 +22,7 @@ class SpaceSeparatedStringArray(rdfvalue.RDFString):
   """A special string which stores strings as space separated."""
 
   def __iter__(self):
-    for value in self._value.split():
-      yield value
+    yield from self._value.split()
 
 
 class VersionString(rdfvalue.RDFString):
@@ -170,11 +169,7 @@ class VFSGRRClient(standard.VFSDirectory):
   @property
   def age(self):
     """RDFDatetime at which the object was created."""
-    # TODO(user) move up to AFF4Object after some analysis of how .age is
-    # used in the codebase.
-    aff4_type = self.Get(self.Schema.TYPE)
-
-    if aff4_type:
+    if aff4_type := self.Get(self.Schema.TYPE):
       return aff4_type.age
     else:
       # If there is no type attribute yet, we have only just been created and
@@ -187,11 +182,12 @@ class VFSGRRClient(standard.VFSDirectory):
 
   def Update(self, attribute=None, priority=None):
     if attribute == "CONTAINS":
-      flow_id = flow.GRRFlow.StartFlow(client_id=self.client_id,
-                                       flow_name="Interrogate",
-                                       token=self.token, priority=priority)
-
-      return flow_id
+      return flow.GRRFlow.StartFlow(
+          client_id=self.client_id,
+          flow_name="Interrogate",
+          token=self.token,
+          priority=priority,
+      )
 
   def OpenMember(self, path, mode="rw"):
     return aff4.AFF4Volume.OpenMember(self, path, mode=mode)
@@ -238,7 +234,7 @@ class VFSGRRClient(standard.VFSDirectory):
     dev = pathspec[0].path
     if pathspec[0].HasField("offset"):
       # We divide here just to get prettier numbers in the GUI
-      dev += ":" + str(pathspec[0].offset / 512)
+      dev += f":{str(pathspec[0].offset / 512)}"
 
     if (len(pathspec) > 1 and
         pathspec[0].pathtype == rdfvalue.PathSpec.PathType.OS and
@@ -261,11 +257,11 @@ class VFSGRRClient(standard.VFSDirectory):
       # reversible since we always use the PathSpec when accessing files on the
       # client.
       if p.HasField("offset"):
-        component += ":" + str(p.offset / 512)
+        component += f":{str(p.offset / 512)}"
 
       # Support ADS names.
       if p.HasField("stream_name"):
-        component += ":" + p.stream_name
+        component += f":{p.stream_name}"
 
       result.append(component)
 
@@ -351,11 +347,7 @@ class VFSFile(aff4.AFF4Image):
   def Update(self, attribute=None, priority=None):
     """Update an attribute from the client."""
     if attribute == self.Schema.CONTENT:
-      # List the directory on the client
-      currently_running = self.Get(self.Schema.CONTENT_LOCK)
-
-      # Is this flow still active?
-      if currently_running:
+      if currently_running := self.Get(self.Schema.CONTENT_LOCK):
         flow_obj = aff4.FACTORY.Open(currently_running, token=self.token)
         if flow_obj.IsRunning():
           return
@@ -438,10 +430,7 @@ class GRRForeman(aff4.AFF4Object):
 
   def _CheckIfHuntTaskWasAssigned(self, client_id, hunt_id):
     """Will return True if hunt's task was assigned to this client before."""
-    for _ in aff4.FACTORY.Stat(
-        [client_id.Add("flows/%s:hunt" %
-                       rdfvalue.RDFURN(hunt_id).Basename())],
-        token=self.token):
+    for _ in aff4.FACTORY.Stat([client_id.Add(f"flows/{rdfvalue.RDFURN(hunt_id).Basename()}:hunt")], token=self.token):
       return True
 
     return False
@@ -550,9 +539,9 @@ class GRRForeman(aff4.AFF4Object):
     except AttributeError:
       last_foreman_run = 0
 
-    latest_rule = max([rule.created for rule in rules])
+    latest_rule = max(rule.created for rule in rules)
 
-    if latest_rule <= int(last_foreman_run):
+    if latest_rule <= last_foreman_run:
       return 0
 
     # Update the latest checked rule on the client.
@@ -571,7 +560,7 @@ class GRRForeman(aff4.AFF4Object):
       if rule.expires < now:
         expired_rules = True
         continue
-      if rule.created <= int(last_foreman_run):
+      if rule.created <= last_foreman_run:
         continue
 
       relevant_rules.append(rule)
@@ -582,16 +571,13 @@ class GRRForeman(aff4.AFF4Object):
         aff4_object = client_id.Add(int_rule.path)
         object_urns[str(aff4_object)] = aff4_object
 
-    # Retrieve all aff4 objects we need.
-    objects = {}
-    for fd in aff4.FACTORY.MultiOpen(object_urns, token=self.token):
-      objects[fd.urn] = fd
-
-    actions_count = 0
-    for rule in relevant_rules:
-      if self._EvaluateRules(objects, rule, client_id):
-        actions_count += self._RunActions(rule, client_id)
-
+    objects = {
+        fd.urn: fd
+        for fd in aff4.FACTORY.MultiOpen(object_urns, token=self.token)
+    }
+    actions_count = sum(
+        self._RunActions(rule, client_id) for rule in relevant_rules
+        if self._EvaluateRules(objects, rule, client_id))
     if expired_rules:
       self.ExpireRules()
 
@@ -643,8 +629,7 @@ class VFSFileSymlink(aff4.AFF4Stream):
   def Initialize(self):
     """Open the delegate object."""
     if "r" in self.mode:
-      delegate = self.Get(self.Schema.DELEGATE)
-      if delegate:
+      if delegate := self.Get(self.Schema.DELEGATE):
         self.delegate = aff4.FACTORY.Open(delegate, mode=self.mode,
                                           token=self.token, age=self.age_policy)
 

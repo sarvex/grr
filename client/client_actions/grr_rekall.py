@@ -179,9 +179,7 @@ class GrrRekallSession(session.InteractiveSession):
 
   def LoadProfile(self, name):
     """Wraps the Rekall profile's LoadProfile to fetch profiles from GRR."""
-    # If the user specified a special profile path we use their choice.
-    profile = super(GrrRekallSession, self).LoadProfile(name)
-    if profile:
+    if profile := super(GrrRekallSession, self).LoadProfile(name):
       return profile
 
     # Cant load the profile, we need to ask the server for it.
@@ -221,7 +219,7 @@ class WriteRekallProfile(actions.ActionPlugin):
     except OSError:
       pass
 
-    with open(output_filename + ".gz", "wb") as fd:
+    with open(f"{output_filename}.gz", "wb") as fd:
       fd.write(args.data)
 
 
@@ -230,10 +228,7 @@ class RekallCachingIOManager(io_manager.DirectoryIOManager):
 
   def CheckInventory(self, name):
     path = self._GetAbsolutePathName(name)
-    result = (os.access(path + ".gz", os.F_OK) or
-              os.access(path, os.F_OK))
-
-    return result
+    return os.access(f"{path}.gz", os.F_OK) or os.access(path, os.F_OK)
 
 
 class RekallAction(actions.SuspendableAction):

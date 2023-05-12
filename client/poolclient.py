@@ -74,13 +74,10 @@ def CreateClientPool(n):
 
   # Load previously stored clients.
   try:
-    fd = open(flags.FLAGS.cert_file, "rb")
-    certificates = pickle.load(fd)
-    fd.close()
-
-    for certificate in certificates:
-      clients.append(PoolGRRClient(private_key=certificate))
-
+    with open(flags.FLAGS.cert_file, "rb") as fd:
+      certificates = pickle.load(fd)
+    clients.extend(
+        PoolGRRClient(private_key=certificate) for certificate in certificates)
     clients_loaded = True
   except (IOError, EOFError):
     clients_loaded = False

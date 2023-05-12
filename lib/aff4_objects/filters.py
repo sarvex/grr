@@ -26,10 +26,7 @@ class HasPredicateFilter(aff4.AFF4Filter):
     self.attribute_name = attribute_name
 
   def FilterOne(self, subject):
-    if subject.Get(self.attribute_name):
-      return subject
-
-    return False
+    return subject if subject.Get(self.attribute_name) else False
 
 
 class AndFilter(aff4.AFF4Filter):
@@ -57,9 +54,7 @@ class OrFilter(AndFilter):
 
   def FilterOne(self, subject):
     for part in self.parts:
-      result = part.FilterOne(subject)
-      # If any of the parts is not False, return it.
-      if result:
+      if result := part.FilterOne(subject):
         return result
 
 
@@ -110,14 +105,12 @@ class PredicateContainsFilter(PredicateLessThanFilter):
       self.regex = re.compile(value)
 
   def FilterOne(self, subject):
-    # If the regex is empty, this is a passthrough.
     if self.regex is None:
       return subject
-    else:
-      predicate_value = subject.Get(self.attribute_name)
-      if (predicate_value and
-          self.regex.search(utils.SmartUnicode(predicate_value))):
-        return subject
+    predicate_value = subject.Get(self.attribute_name)
+    if (predicate_value and
+        self.regex.search(utils.SmartUnicode(predicate_value))):
+      return subject
 
 
 class SubjectContainsFilter(aff4.AFF4Filter):

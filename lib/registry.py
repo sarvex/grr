@@ -23,54 +23,59 @@ from grr.lib import compatibility
 class MetaclassRegistry(abc.ABCMeta):
   """Automatic Plugin Registration through metaclasses."""
 
-  def __init__(cls, name, bases, env_dict):
-    abc.ABCMeta.__init__(cls, name, bases, env_dict)
+  def __init__(self, name, bases, env_dict):
+    abc.ABCMeta.__init__(self, name, bases, env_dict)
 
     # Abstract classes should not be registered. We define classes as abstract
     # by giving them the __abstract attribute (this is not inheritable) or by
     # naming them Abstract<ClassName>.
-    abstract_attribute = "_%s__abstract" % name
+    abstract_attribute = f"_{name}__abstract"
 
-    if (not cls.__name__.startswith("Abstract") and
-        not hasattr(cls, abstract_attribute)):
+    if not self.__name__.startswith("Abstract") and not hasattr(
+        self, abstract_attribute):
       # Attach the classes dict to the baseclass and have all derived classes
       # use the same one:
       for base in bases:
         try:
-          cls.classes = base.classes
-          cls.classes_by_name = base.classes_by_name
-          cls.plugin_feature = base.plugin_feature
-          cls.top_level_class = base.top_level_class
+          self.classes = base.classes
+          self.classes_by_name = base.classes_by_name
+          self.plugin_feature = base.plugin_feature
+          self.top_level_class = base.top_level_class
           break
         except AttributeError:
           pass
 
       try:
-        if cls.classes and cls.__name__ in cls.classes:
+        if self.classes and self.__name__ in self.classes:
           # TODO(user): this should really raise instead of just logging,
           # since it can hide serious problems with registration.  Unfortunately
           # gui/runtests.TestPluginInit relies on being able to re-import and
           # overwrite the test plugins after django has been initialized.
-          logging.warn("Duplicate names for registered classes: %s, %s",
-                       cls, cls.classes[cls.__name__])
+          logging.warn(
+              "Duplicate names for registered classes: %s, %s",
+              self,
+              self.classes[self.__name__],
+          )
 
-        cls.classes[cls.__name__] = cls
-        cls.classes_by_name[getattr(cls, "name", None)] = cls
-        cls.class_list.append(cls)
-        if hasattr(cls, "_ClsHelpEpilog"):
-          cls.__doc__ = "%s\n\n%s" % (getattr(cls, "__doc__", ""),
-                                      cls._ClsHelpEpilog())
+        self.classes[self.__name__] = self
+        self.classes_by_name[getattr(self, "name", None)] = self
+        self.class_list.append(self)
+        if hasattr(self, "_ClsHelpEpilog"):
+          self.__doc__ = "%s\n\n%s" % (
+              getattr(self, "__doc__", ""),
+              self._ClsHelpEpilog(),
+          )
       except AttributeError:
-        cls.classes = {cls.__name__: cls}
-        cls.classes_by_name = {getattr(cls, "name", None): cls}
-        cls.class_list = [cls]
-        cls.plugin_feature = cls.__name__
+        self.classes = {self.__name__: self}
+        self.classes_by_name = {getattr(self, "name", None): self}
+        self.class_list = [self]
+        self.plugin_feature = self.__name__
         # Keep a reference to the top level class
-        cls.top_level_class = cls
+        self.top_level_class = self
 
       try:
-        if cls.top_level_class.include_plugins_as_attributes:
-          setattr(cls.top_level_class, cls.__name__, cls)
+        if self.top_level_class.include_plugins_as_attributes:
+          setattr(self.top_level_class, self.__name__, self)
 
       except AttributeError:
         pass
@@ -79,19 +84,19 @@ class MetaclassRegistry(abc.ABCMeta):
       # registered.
       for base in bases:
         try:
-          cls.classes = base.classes
-          cls.classes_by_name = base.classes_by_name
+          self.classes = base.classes
+          self.classes_by_name = base.classes_by_name
           break
         except AttributeError:
           pass
 
-      if not hasattr(cls, "classes"):
-        cls.classes = {}
+      if not hasattr(self, "classes"):
+        self.classes = {}
 
-      if not hasattr(cls, "classes_by_name"):
-        cls.classes_by_name = {}
+      if not hasattr(self, "classes_by_name"):
+        self.classes_by_name = {}
 
-  def GetPlugin(cls, name):
+  def GetPlugin(self, name):
     """Return the class of the implementation that carries that name.
 
     Args:
@@ -103,7 +108,7 @@ class MetaclassRegistry(abc.ABCMeta):
     Returns:
        A the registered class referred to by the name.
     """
-    return cls.classes[name]
+    return self.classes[name]
 
 
 # Utility functions

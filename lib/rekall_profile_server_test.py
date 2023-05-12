@@ -28,7 +28,7 @@ class FakeHandle(object):
 
   def __init__(self, url):
     # Convert the url back into a profile canonical name.
-    profile = url.split(constants.PROFILE_REPOSITORY_VERSION + "/")[1]
+    profile = url.split(f"{constants.PROFILE_REPOSITORY_VERSION}/")[1]
     profile = profile.split(".")[0]
     self.profile = profile
 

@@ -193,11 +193,7 @@ class FloatRenderer(semantic.RDFValueRenderer):
 
   def Layout(self, request, response):
 
-    if self.proxy is None:
-      self.value = "0.0"
-    else:
-      self.value = "%.2f" % self.proxy
-
+    self.value = "0.0" if self.proxy is None else "%.2f" % self.proxy
     super(FloatRenderer, self).Layout(request, response)
 
 
@@ -244,7 +240,7 @@ back to hunt view</a>
   def Layout(self, request, response):
     """Ensure our hunt is in our state for HTML layout."""
     hunt_id = request.REQ.get("hunt_id")
-    self.title = "Viewing Hunt %s" % hunt_id
+    self.title = f"Viewing Hunt {hunt_id}"
     h = dict(main="ManageHunts", hunt_id=hunt_id)
     self.hunt_hash = urllib.urlencode(sorted(h.items()))
 
@@ -271,9 +267,7 @@ back to hunt view</a>
     resource_max = [0, 0, 0]
     for resource in resource_usage.values():
       for i in range(3):
-        if resource_max[i] < resource[i]:
-          resource_max[i] = resource[i]
-
+        resource_max[i] = max(resource_max[i], resource[i])
     results = {}
     for status, client_list in self.hunt.GetClientsByStatus().items():
       if (completion_status_filter == "ALL" or
@@ -538,8 +532,7 @@ class HuntLogRenderer(renderers.AngularDirectiveRenderer):
   directive = "grr-hunt-log"
 
   def Layout(self, request, response):
-    self.directive_args = {}
-    self.directive_args["hunt-urn"] = request.REQ.get("hunt_id")
+    self.directive_args = {"hunt-urn": request.REQ.get("hunt_id")}
     return super(HuntLogRenderer, self).Layout(request, response)
 
 
@@ -547,8 +540,7 @@ class HuntErrorRenderer(renderers.AngularDirectiveRenderer):
   directive = "grr-hunt-errors"
 
   def Layout(self, request, response):
-    self.directive_args = {}
-    self.directive_args["hunt-urn"] = request.REQ.get("hunt_id")
+    self.directive_args = {"hunt-urn": request.REQ.get("hunt_id")}
     return super(HuntErrorRenderer, self).Layout(request, response)
 
 
@@ -714,8 +706,7 @@ class HuntHostInformationRenderer(fileview.AFF4Stats):
 
   def Layout(self, request, response):
     """Produce a summary of the client information."""
-    client_id = request.REQ.get("hunt_client")
-    if client_id:
+    if client_id := request.REQ.get("hunt_client"):
       super(HuntHostInformationRenderer, self).Layout(
           request, response, client_id=client_id,
           aff4_path=rdfvalue.ClientURN(client_id),
@@ -761,9 +752,9 @@ class CSVOutputPluginNoteRenderer(OutputPluginNoteRenderer):
 
   def Layout(self, request, response):
     self.output_urns = []
-    for output_file in self.plugin_state.output_streams.values():
-      self.output_urns.append(output_file.urn)
-
+    self.output_urns.extend(
+        output_file.urn
+        for output_file in self.plugin_state.output_streams.values())
     response = super(CSVOutputPluginNoteRenderer, self).Layout(request,
                                                                response)
     return self.CallJavascript(response, "CSVOutputPluginNoteRenderer.Layout")
@@ -977,9 +968,7 @@ class HuntStatsRenderer(renderers.TemplateRenderer):
 
   def Layout(self, request, response):
     """Layout the HuntStatsRenderer data."""
-    hunt_id = request.REQ.get("hunt_id")
-
-    if hunt_id:
+    if hunt_id := request.REQ.get("hunt_id"):
       try:
         hunt = aff4.FACTORY.Open(hunt_id,
                                  aff4_type="GRRHunt",
@@ -1053,8 +1042,7 @@ class HuntOutstandingRenderer(renderers.TableRenderer):
     while act_flows:
       next_flows = []
       for _, children in aff4.FACTORY.MultiListChildren(act_flows, token=token):
-        for flow_urn in children:
-          next_flows.append(flow_urn)
+        next_flows.extend(iter(children))
       all_flows.extend(next_flows)
       act_flows = next_flows
 
@@ -1120,12 +1108,10 @@ class HuntOutstandingRenderer(renderers.TableRenderer):
         elif isinstance(obj, rdfvalue.GrrMessage):
           status_by_request.setdefault(flow_urn, {})[obj.request_id] = obj
 
-    response_urns = []
-
-    for request_base_urn, request in waitingfor.iteritems():
-      response_urns.append(rdfvalue.RDFURN(request_base_urn).Add(
-          "request:%08X" % request.id))
-
+    response_urns = [
+        rdfvalue.RDFURN(request_base_urn).Add("request:%08X" % request.id)
+        for request_base_urn, request in waitingfor.iteritems()
+    ]
     response_dict = dict(data_store.DB.MultiResolveRegex(
         response_urns, "flow:.*", token=token))
 
@@ -1149,11 +1135,9 @@ class HuntOutstandingRenderer(renderers.TableRenderer):
         if client_requests is None:
           client_requests_available = "Must use raw access."
         else:
-          client_requests_available = 0
-          for client_req in client_requests.setdefault(client_id, []):
-            if request_obj.request.session_id == client_req.session_id:
-              client_requests_available += 1
-
+          client_requests_available = sum(
+              1 for client_req in client_requests.setdefault(client_id, [])
+              if request_obj.request.session_id == client_req.session_id)
         row_data = {
             "Client": client_id,
             "Flow": flow_urn,

@@ -50,8 +50,7 @@ class Dll(object):
 
   @property
   def imported_functions(self):
-    for fn in self._imported_functions:
-      yield fn
+    yield from self._imported_functions
 
 
 class DummyFile(object):
@@ -84,8 +83,7 @@ class DummyFile(object):
 
   @property
   def deferred_values(self):
-    for v in ["a", "b"]:
-      yield v
+    yield from ["a", "b"]
 
   @property
   def novalues(self):
@@ -200,8 +198,7 @@ class ObjectFilterTest(unittest.TestCase):
   def testBinaryOperators(self):
     for operator, test_data in self.operator_tests.items():
       for test_unit in test_data:
-        print ("Testing %s with %s and %s" % (
-            operator, test_unit[0], test_unit[1]))
+        print(f"Testing {operator} with {test_unit[0]} and {test_unit[1]}")
         kwargs = {"arguments": test_unit[1],
                   "value_expander": self.value_expander}
         self.assertEqual(test_unit[0], operator(**kwargs).Matches(self.file))
@@ -267,11 +264,15 @@ class ObjectFilterTest(unittest.TestCase):
     self.assertListEqual(list(values), [])
 
   def testGenericBinaryOperator(self):
+
+
+
     class TestBinaryOperator(objectfilter.GenericBinaryOperator):
-      values = list()
+      values = []
 
       def Operation(self, x, _):
         return self.values.append(x)
+
 
     # Test a common binary operator
     tbo = TestBinaryOperator(arguments=["whatever", 0],

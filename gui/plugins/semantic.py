@@ -84,13 +84,7 @@ class RDFValueColumn(renderers.TableColumn):
     else:
       renderer = FindRendererForObject(value)
 
-    # Intantiate the renderer and return the HTML
-    if renderer:
-      result = renderer.RawHTML(request)
-    else:
-      result = utils.SmartStr(value)
-
-    return result
+    return renderer.RawHTML(request) if renderer else utils.SmartStr(value)
 
 
 class AttributeColumn(RDFValueColumn):
@@ -354,21 +348,17 @@ class RDFValueArrayRenderer(RDFValueRenderer):
     start = int(request.REQ.pop("start", 0))
     length = int(request.REQ.pop("length", 10))
 
-    # We can get called again to render from an existing cache.
-    cache = request.REQ.pop("cache", None)
-    if cache:
+    if cache := request.REQ.pop("cache", None):
       self.cache = aff4.FACTORY.Open(cache, token=request.token)
       self.proxy = rdfvalue.RDFValueArray(self.cache.Read(1000000))
 
-    else:
-      # We need to create a cache if this is too long.
-      if len(self.proxy) > length:
-        # Make a cache
-        with aff4.FACTORY.Create(None, "TempMemoryFile",
-                                 token=request.token) as self.cache:
-          data = rdfvalue.RDFValueArray()
-          data.Extend(self.proxy)
-          self.cache.Write(data.SerializeToString())
+    elif len(self.proxy) > length:
+      # Make a cache
+      with aff4.FACTORY.Create(None, "TempMemoryFile",
+                               token=request.token) as self.cache:
+        data = rdfvalue.RDFValueArray()
+        data.Extend(self.proxy)
+        self.cache.Write(data.SerializeToString())
 
     self.data = []
 
@@ -382,8 +372,7 @@ class RDFValueArrayRenderer(RDFValueRenderer):
         self.length = 100
         break
 
-      renderer = FindRendererForObject(element)
-      if renderer:
+      if renderer := FindRendererForObject(element):
         try:
           self.data.append(renderer.RawHTML(request))
         except Exception as e:  # pylint: disable=broad-except
@@ -437,14 +426,11 @@ class DictRenderer(RDFValueRenderer):
       if key in self.filter_keys:
         continue
       try:
-        renderer = FindRendererForObject(value)
-        if renderer:
+        if renderer := FindRendererForObject(value):
           value = renderer.RawHTML(request)
         else:
           raise TypeError("Unknown renderer")
 
-      # If the translation fails for whatever reason, just output the string
-      # value literally (after escaping)
       except TypeError:
         value = self.FormatFromTemplate(self.translator_error_template,
                                         value=value)
@@ -504,7 +490,7 @@ class RDFValueCollectionRenderer(renderers.TableRenderer):
       self.show_total_count = False
 
     row_index = start_row
-    for value in itertools.islice(collection, start_row, end_row):
+    for value in itertools.islice(collection, row_index, end_row):
       self.AddCell(row_index, "Value", value)
       row_index += 1
 
@@ -697,9 +683,9 @@ class KeyValueFormRenderer(forms.TypeDescriptorFormRenderer):
 
   def ParseArgs(self, request):
     """Parse the request into a KeyValue proto."""
-    key = request.REQ.get("%s_key" % self.prefix)
-    value = request.REQ.get("%s_value" % self.prefix)
-    value_type = request.REQ.get("%s_type" % self.prefix)
+    key = request.REQ.get(f"{self.prefix}_key")
+    value = request.REQ.get(f"{self.prefix}_value")
+    value_type = request.REQ.get(f"{self.prefix}_type")
 
     if key is None:
       return
@@ -722,7 +708,7 @@ class KeyValueFormRenderer(forms.TypeDescriptorFormRenderer):
         value = False
 
       else:
-        raise ValueError("Value %s is not a boolean" % value)
+        raise ValueError(f"Value {value} is not a boolean")
     elif value_type == "String":
       value = value.decode("utf8")
 

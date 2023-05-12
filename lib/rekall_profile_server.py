@@ -81,9 +81,7 @@ class RekallRepositoryProfileServer(ProfileServer):
   def GetProfileByName(self, profile_name,
                        version=constants.PROFILE_REPOSITORY_VERSION):
     try:
-      url = "%s/%s/%s.gz" % (
-          config_lib.CONFIG["Rekall.profile_repository"],
-          version, profile_name)
+      url = f'{config_lib.CONFIG["Rekall.profile_repository"]}/{version}/{profile_name}.gz'
       handle = urllib2.urlopen(url, timeout=10)
 
     except urllib2.HTTPError as e:
@@ -134,15 +132,12 @@ class GRRRekallProfileServer(CachingProfileServer,
     inventory = json.loads(inventory_json)
 
     cache_urn = rdfvalue.RDFURN(config_lib.CONFIG["Rekall.profile_cache_urn"])
-    profile_urns = {}
-    for profile in inventory["$INVENTORY"]:
-      profile_urns[profile] = cache_urn.Add(version).Add(profile)
-
+    profile_urns = {
+        profile: cache_urn.Add(version).Add(profile)
+        for profile in inventory["$INVENTORY"]
+    }
     stats = aff4.FACTORY.Stat(profile_urns.values())
-    profile_infos = {}
-    for metadata in stats:
-      profile_infos[metadata["urn"]] = metadata["type"][1]
-
+    profile_infos = {metadata["urn"]: metadata["type"][1] for metadata in stats}
     for profile, profile_urn in sorted(profile_urns.items()):
       if (profile_urn not in profile_infos or
           profile_infos[profile_urn] != u"AFF4RekallProfile"):

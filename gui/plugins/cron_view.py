@@ -165,11 +165,8 @@ class CronTable(renderers.TableRenderer):
     statuses = itertools.islice(
         cron_job.GetValuesForAttribute(cron_job.Schema.LAST_RUN_STATUS), 0, 4)
 
-    failures_count = 0
-    for status in statuses:
-      if status.status != rdfvalue.CronJobRunStatus.Status.OK:
-        failures_count += 1
-
+    failures_count = sum(1 for status in statuses
+                         if status.status != rdfvalue.CronJobRunStatus.Status.OK)
     return failures_count >= 2
 
   def IsCronJobStuck(self, cron_job):
@@ -221,9 +218,8 @@ class CronJobManagementTabs(renderers.TabLayout):
   def Layout(self, request, response):
     if not request.REQ.get("cron_job_urn"):
       return self.RenderFromTemplate(self.empty_template, response)
-    else:
-      self.state = dict(cron_job_urn=request.REQ.get("cron_job_urn"))
-      return super(CronJobManagementTabs, self).Layout(request, response)
+    self.state = dict(cron_job_urn=request.REQ.get("cron_job_urn"))
+    return super(CronJobManagementTabs, self).Layout(request, response)
 
 
 class CronJobView(flow_management.ListFlowsTable):
@@ -270,7 +266,7 @@ successfully!</p>
 
   @property
   def header(self):
-    return self.action_name.title() + " a cron job?"
+    return f"{self.action_name.title()} a cron job?"
 
   def Layout(self, request, response):
     self.check_access_subject = rdfvalue.RDFURN(request.REQ.get("cron_urn"))
@@ -353,8 +349,7 @@ class CronHuntParser(new_hunt.HuntArgsParser):
 
     params.flow_runner_args.flow_name = "CreateAndRunGenericHuntFlow"
     params.flow_args.hunt_runner_args = self.ParseHuntRunnerArgs()
-    params.flow_args.hunt_runner_args.description = ("%s Cron" %
-                                                     params.description)
+    params.flow_args.hunt_runner_args.description = f"{params.description} Cron"
     params.flow_args.hunt_args = self.ParseHuntArgs()
 
     return params

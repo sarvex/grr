@@ -22,8 +22,8 @@ class TestStats(test_lib.GRRSeleniumTest):
     token = access_control.ACLToken(username="test", reason="fixture")
 
     with aff4.FACTORY.Create(
-        "aff4:/stats/ClientFleetStats/All", "ClientFleetStats",
-        token=token) as fd:
+          "aff4:/stats/ClientFleetStats/All", "ClientFleetStats",
+          token=token) as fd:
       now = 1321057655
 
       for i in range(10, 15):
@@ -31,7 +31,7 @@ class TestStats(test_lib.GRRSeleniumTest):
             age=int((now + i * 60 * 60 * 24) * 1e6))
 
         for number in [1, 7, 14, 30]:
-          graph = rdfvalue.Graph(title="%s day actives" % number)
+          graph = rdfvalue.Graph(title=f"{number} day actives")
           graph.Append(label="Windows", y_value=i + number)
           graph.Append(label="Linux", y_value=i * 2 + number)
 

@@ -90,9 +90,8 @@ class GRRTempFileTestFilename(test_lib.GRRBaseTest):
     tempfiles.DeleteGRRTempFile(fd.name)
     self.assertFalse(os.path.exists(fd.name))
 
-    fd = open(os.path.join(self.temp_dir, "notatmpfile"), "w")
-    fd.write("something")
-    fd.close()
+    with open(os.path.join(self.temp_dir, "notatmpfile"), "w") as fd:
+      fd.write("something")
     self.assertTrue(os.path.exists(fd.name))
     self.assertRaises(tempfiles.ErrorNotTempFile,
                       tempfiles.DeleteGRRTempFile,
@@ -105,7 +104,7 @@ class DeleteGRRTempFiles(test_lib.EmptyActionTest):
 
   def setUp(self):
     super(DeleteGRRTempFiles, self).setUp()
-    filename = "%s_blah" % config_lib.CONFIG["Client.tempfile_prefix"]
+    filename = f'{config_lib.CONFIG["Client.tempfile_prefix"]}_blah'
     self.tempfile = utils.JoinPath(self.temp_dir,
                                    "delete_test", filename)
     self.dirname = os.path.dirname(self.tempfile)

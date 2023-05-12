@@ -51,12 +51,7 @@ def StringifyJSON(item):
     return [StringifyJSON(x) for x in item]
 
   elif isinstance(item, dict):
-    result = {}
-    for k, v in item.items():
-      result[k] = StringifyJSON(v)
-
-    return result
-
+    return {k: StringifyJSON(v) for k, v in item.items()}
   elif type(item) in (int, long, float):
     return item
 
@@ -192,7 +187,7 @@ class Renderer(object):
     js_state.update(StringifyJSON(kwargs))
 
     if "." not in method:
-      method = "%s.%s" % (self.__class__.__name__, method)
+      method = f"{self.__class__.__name__}.{method}"
 
     js_state_json = JsonDumpForScriptContext(js_state)
     self.RenderFromTemplate(self.js_call_template, response,
@@ -278,8 +273,7 @@ class Renderer(object):
 
   @property
   def javascript_path(self):
-    return "static/javascript/%s.js" % (
-        self.classes[self.renderer].__module__.split(".")[-1])
+    return f'static/javascript/{self.classes[self.renderer].__module__.split(".")[-1]}.js'
 
 
 # This will register all classes into this modules's namespace regardless of
@@ -467,11 +461,9 @@ class TableColumn(object):
 
     if self.renderer:
       renderer = self.renderer(value)
-      result = renderer.RawHTML(request)
+      return renderer.RawHTML(request)
     else:
-      result = utils.SmartStr(value)
-
-    return result
+      return utils.SmartStr(value)
 
 
 class TableRenderer(TemplateRenderer):
@@ -524,7 +516,7 @@ class TableRenderer(TemplateRenderer):
       row_index = self.size
 
     if row_dict is not None:
-      kwargs.update(row_dict)
+      kwargs |= row_dict
 
     for k, v in kwargs.iteritems():
       try:
@@ -644,7 +636,7 @@ class TableRenderer(TemplateRenderer):
         opts += "sortable=1 "
 
       # Ask each column to draw itself
-      headers.write("<th %s >" % opts)
+      headers.write(f"<th {opts} >")
       i.LayoutHeader(request, headers)
       headers.write("</th>")
 
@@ -700,10 +692,10 @@ class TableRenderer(TemplateRenderer):
       except KeyError:
         pass
 
-      row = []
-      for c in self.columns:
-        row.append(utils.SmartStr(c.RenderRow(index, request, row_options)))
-
+      row = [
+          utils.SmartStr(c.RenderRow(index, request, row_options))
+          for c in self.columns
+      ]
       self.rows.append((row, row_options.items()))
 
     if self.additional_rows is None:
@@ -949,13 +941,13 @@ class Splitter(TemplateRenderer):
 
     # Pre-render the top and bottom layout contents to avoid extra round trips.
     self.left_pane = self.classes[self.left_renderer](
-        id="%s_leftPane" % self.id).RawHTML(request)
+        id=f"{self.id}_leftPane").RawHTML(request)
 
     self.top_right_pane = self.classes[self.top_right_renderer](
-        id="%s_rightTopPane" % self.id).RawHTML(request)
+        id=f"{self.id}_rightTopPane").RawHTML(request)
 
     self.bottom_right_pane = self.classes[self.bottom_right_renderer](
-        id="%s_rightBottomPane" % self.id).RawHTML(request)
+        id=f"{self.id}_rightBottomPane").RawHTML(request)
 
     response = super(Splitter, self).Layout(request, response)
     return self.CallJavascript(response, "Splitter.Layout",
@@ -984,12 +976,10 @@ class Splitter2Way(TemplateRenderer):
 
     # Pre-render the top and bottom layout contents to avoid extra round trips.
     self.top_pane = self.classes[self.top_renderer](
-        id="%s_topPane" % self.id,
-        state=self.state.copy()).RawHTML(request)
+        id=f"{self.id}_topPane", state=self.state.copy()).RawHTML(request)
 
     self.bottom_pane = self.classes[self.bottom_renderer](
-        id="%s_bottomPane" % self.id,
-        state=self.state.copy()).RawHTML(request)
+        id=f"{self.id}_bottomPane", state=self.state.copy()).RawHTML(request)
 
     response = super(Splitter2Way, self).Layout(request, response)
     return self.CallJavascript(response, "Splitter2Way.Layout")
@@ -1020,12 +1010,10 @@ class Splitter2WayVertical(TemplateRenderer):
 
     # Pre-render the top and bottom layout contents to avoid extra round trips.
     self.left_pane = self.classes[self.left_renderer](
-        id="%s_leftPane" % self.id,
-        state=self.state.copy()).RawHTML(request)
+        id=f"{self.id}_leftPane", state=self.state.copy()).RawHTML(request)
 
     self.right_pane = self.classes[self.right_renderer](
-        id="%s_rightPane" % self.id,
-        state=self.state.copy()).RawHTML(request)
+        id=f"{self.id}_rightPane", state=self.state.copy()).RawHTML(request)
 
     response = super(Splitter2WayVertical, self).Layout(request, response)
     return self.CallJavascript(response, "Splitter2WayVertical.Layout",

@@ -87,8 +87,7 @@ def BuildToken(request, execution_time):
       expiry=rdfvalue.RDFDatetime().Now() + execution_time)
 
   for field in ["REMOTE_ADDR", "HTTP_X_FORWARDED_FOR"]:
-    remote_addr = request.META.get(field, "")
-    if remote_addr:
+    if remote_addr := request.META.get(field, ""):
       token.source_ips.append(remote_addr)
   return token
 
@@ -106,8 +105,8 @@ def RegisterHttpRouteHandler(method, route, renderer_cls):
 def GetRendererForHttpRequest(request):
   """Returns a renderer to handle given HTTP request."""
 
-  matcher = HTTP_ROUTING_MAP.bind("%s:%s" % (request.environ["SERVER_NAME"],
-                                             request.environ["SERVER_PORT"]))
+  matcher = HTTP_ROUTING_MAP.bind(
+      f'{request.environ["SERVER_NAME"]}:{request.environ["SERVER_PORT"]}')
   try:
     match = matcher.match(request.path, request.method)
   except werkzeug_exceptions.NotFound:
@@ -156,39 +155,35 @@ def RenderHttpResponse(request):
 
   renderer, route_args = GetRendererForHttpRequest(request)
 
-  if request.method == "GET":
+  if request.method != "GET":
+    raise RuntimeError(f"Unsupported method: {renderer.method}.")
 
-    if renderer.args_type:
-      unprocessed_request = request.GET
-      if hasattr(unprocessed_request, "dict"):
-        unprocessed_request = unprocessed_request.dict()
+  if renderer.args_type:
+    unprocessed_request = request.GET
+    if hasattr(unprocessed_request, "dict"):
+      unprocessed_request = unprocessed_request.dict()
 
-      args = renderer.args_type()
-      for type_info in args.type_infos:
-        if type_info.name in route_args:
-          args.Set(type_info.name, route_args[type_info.name])
-        elif type_info.name in unprocessed_request:
-          args.Set(type_info.name, unprocessed_request[type_info.name])
+    args = renderer.args_type()
+    for type_info in args.type_infos:
+      if type_info.name in route_args:
+        args.Set(type_info.name, route_args[type_info.name])
+      elif type_info.name in unprocessed_request:
+        args.Set(type_info.name, unprocessed_request[type_info.name])
 
-      if renderer.additional_args_types:
-        if not hasattr(args, "additional_args"):
-          raise RuntimeError("Renderer %s defines additional arguments types "
-                             "but its arguments object does not have "
-                             "'additional_args' field." % renderer)
+    if renderer.additional_args_types:
+      if not hasattr(args, "additional_args"):
+        raise RuntimeError(
+            f"Renderer {renderer} defines additional arguments types but its arguments object does not have 'additional_args' field."
+        )
 
-        if hasattr(renderer.additional_args_types, "__call__"):
-          additional_args_types = renderer.additional_args_types()
-        else:
-          additional_args_types = renderer.additional_args_types
+      additional_args_types = (renderer.additional_args_types() if hasattr(
+          renderer.additional_args_types, "__call__") else
+                               renderer.additional_args_types)
+      args.additional_args = FillAdditionalArgsFromRequest(
+          unprocessed_request, additional_args_types)
 
-        args.additional_args = FillAdditionalArgsFromRequest(
-            unprocessed_request, additional_args_types)
-
-    else:
-      args = None
   else:
-    raise RuntimeError("Unsupported method: %s." % renderer.method)
-
+    args = None
   token = BuildToken(request, renderer.max_execution_time)
   rendered_data = renderer.Render(args, token=token)
 

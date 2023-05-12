@@ -406,8 +406,7 @@ class GRRClientWorker(object):
                                 self.last_stats_sent_time.AsSecondsFromEpoch())
 
   def SendNannyMessage(self):
-    msg = self.nanny_controller.GetNannyMessage()
-    if msg:
+    if msg := self.nanny_controller.GetNannyMessage():
       self.SendReply(
           rdfvalue.DataBlob(string=msg),
           session_id=rdfvalue.FlowSessionID(flow_name="NannyMessage"),
@@ -610,16 +609,11 @@ class GRRThreadedWorker(GRRClientWorker, threading.Thread):
 
   def OnStartup(self):
     """A handler that is called on client startup."""
-    # We read the transaction log and fail any requests that are in it. If there
-    # is anything in the transaction log we assume its there because we crashed
-    # last time and let the server know.
-    last_request = self.nanny_controller.GetTransactionLog()
-    if last_request:
+    if last_request := self.nanny_controller.GetTransactionLog():
       status = rdfvalue.GrrStatus(
           status=rdfvalue.GrrStatus.ReturnedStatus.CLIENT_KILLED,
           error_message="Client killed during transaction")
-      nanny_status = self.nanny_controller.GetNannyStatus()
-      if nanny_status:
+      if nanny_status := self.nanny_controller.GetNannyStatus():
         status.nanny_status = nanny_status
 
       self.SendReply(status,
@@ -727,18 +721,13 @@ class GRRHTTPClient(object):
     self.last_foreman_check = 0
 
     # The client worker does all the real work here.
-    if worker:
-      self.client_worker = worker()
-    else:
-      self.client_worker = GRRThreadedWorker()
-
+    self.client_worker = worker() if worker else GRRThreadedWorker()
     # Start off with a maximum polling interval
     self.sleep_time = config_lib.CONFIG["Client.poll_max"]
 
   def GetServerUrl(self):
-    if not self.active_server_url:
-      if not self.EstablishConnection():
-        return ""
+    if not self.active_server_url and not self.EstablishConnection():
+      return ""
     return self.active_server_url
 
   def EstablishConnection(self):
@@ -812,8 +801,7 @@ class GRRHTTPClient(object):
     try:
       # Now send the request using POST
       start = time.time()
-      url = "%s?api=%s" % (self.GetServerUrl(),
-                           config_lib.CONFIG["Network.api"])
+      url = f'{self.GetServerUrl()}?api={config_lib.CONFIG["Network.api"]}'
 
       req = urllib2.Request(utils.SmartStr(url), data,
                             {"Content-Type": "binary/octet-stream"})
@@ -1002,18 +990,17 @@ class GRRHTTPClient(object):
           # Everything went as expected - we don't need to return to
           # the main loop (which would mean sleeping for a poll_time).
           break
-        else:
-          # If we can't reconnect to the server for a long time, we restart
-          # to reset our state. In some very rare cases, the urrlib can get
-          # confused and we need to reset it before we can start talking to
-          # the server again.
-          self.consecutive_connection_errors += 1
-          limit = config_lib.CONFIG["Client.connection_error_limit"]
-          if self.consecutive_connection_errors > limit:
-            raise RuntimeError("Too many connection errors, exiting.")
+        # If we can't reconnect to the server for a long time, we restart
+        # to reset our state. In some very rare cases, the urrlib can get
+        # confused and we need to reset it before we can start talking to
+        # the server again.
+        self.consecutive_connection_errors += 1
+        limit = config_lib.CONFIG["Client.connection_error_limit"]
+        if self.consecutive_connection_errors > limit:
+          raise RuntimeError("Too many connection errors, exiting.")
 
-          # Constantly retrying will not work, we back off a bit.
-          time.sleep(60)
+        # Constantly retrying will not work, we back off a bit.
+        time.sleep(60)
         yield Status()
 
       # Check if there is a message from the nanny to be sent.
@@ -1146,8 +1133,8 @@ class ClientCommunicator(communicator.Communicator):
     """
     # Our CN will be the first 64 bits of the hash of the public key.
     public_key = rsa.pub()[1]
-    self.common_name = rdfvalue.ClientURN("C.%s" % (
-        hashlib.sha256(public_key).digest()[:8].encode("hex")))
+    self.common_name = rdfvalue.ClientURN(
+        f'C.{hashlib.sha256(public_key).digest()[:8].encode("hex")}')
 
   def _LoadOurCertificate(self):
     """Loads an RSA key from the certificate.

@@ -239,7 +239,7 @@ class FlowCreationTest(BasicFlowTest):
     notifications = user_fd.ShowNotifications(reset=False)
     self.assertEqual(len(notifications), 1)
     for notification in notifications:
-      self.assertTrue(notification.message.endswith(": " + msg))
+      self.assertTrue(notification.message.endswith(f": {msg}"))
       self.assertEqual(notification.subject, rdfvalue.RDFURN(session_id))
 
   def testFormatstringNotification(self):
@@ -727,10 +727,7 @@ class GeneralFlowsTest(BasicFlowTest):
   def Work(self, client_mock, worker_mock):
     while True:
       client_processed = client_mock.Next()
-      flows_run = []
-      for flow_run in worker_mock.Next():
-        flows_run.append(flow_run)
-
+      flows_run = list(worker_mock.Next())
       if client_processed == 0 and not flows_run:
         break
 
@@ -862,7 +859,7 @@ class GeneralFlowsTest(BasicFlowTest):
 
     fd = aff4.FACTORY.Open(self.client_id.Add("fs/os").Add(path),
                            token=self.token)
-    directory = [ch for ch in fd.OpenChildren()]
+    directory = list(fd.OpenChildren())
     pb = rdfvalue.PathSpec(path=path,
                            pathtype=rdfvalue.PathSpec.PathType.OS)
     directory2 = list(vfs.VFSOpen(pb).ListFiles())
@@ -1011,16 +1008,12 @@ class GeneralFlowsTest(BasicFlowTest):
 
     while True:
       client_processed = client_mock.Next()
-      flows_run = []
-      for flow_run in worker_mock.Next():
-        flows_run.append(flow_run)
-
+      flows_run = list(worker_mock.Next())
       if client_processed == 0 and not flows_run:
         break
 
     # The flows should be run in order of priority.
-    self.assertEqual(result[0:1],
-                     [u"high priority"])
+    self.assertEqual(result[:1], [u"high priority"])
     self.assertEqual(sorted(result[1:3]),
                      [u"medium priority", u"medium priority2"])
     self.assertEqual(sorted(result[3:5]),
@@ -1056,17 +1049,12 @@ class GeneralFlowsTest(BasicFlowTest):
       client_processed = 1
       while client_processed:
         client_processed = client_mock.Next()
-      # Now process the results, this should happen in the correct order.
-      flows_run = []
-      for flow_run in worker_mock.Next():
-        flows_run.append(flow_run)
-
+      flows_run = list(worker_mock.Next())
       if not flows_run:
         break
 
     # The flows should be run in order of priority.
-    self.assertEqual(server_result[0:1],
-                     [u"high priority"])
+    self.assertEqual(server_result[:1], [u"high priority"])
     self.assertEqual(sorted(server_result[1:3]),
                      [u"medium priority", u"medium priority2"])
     self.assertEqual(sorted(server_result[3:5]),
@@ -1095,10 +1083,7 @@ class FlowLimitTests(BasicFlowTest):
 
     while True:
       client_processed = client_mock.Next()
-      flows_run = []
-      for flow_run in worker_mock.Next():
-        flows_run.append(flow_run)
-
+      flows_run = list(worker_mock.Next())
       if client_processed == 0 and not flows_run:
         break
 

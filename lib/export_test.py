@@ -60,7 +60,7 @@ class DummyRDFValue3ConverterA(export.ExportConverter):
   def Convert(self, metadata, value, token=None):
     _ = metadata
     _ = token
-    return [rdfvalue.DummyRDFValue(str(value) + "A")]
+    return [rdfvalue.DummyRDFValue(f"{str(value)}A")]
 
 
 class DummyRDFValue3ConverterB(export.ExportConverter):
@@ -71,7 +71,7 @@ class DummyRDFValue3ConverterB(export.ExportConverter):
     _ = token
     if not isinstance(value, DummyRDFValue3):
       raise ValueError("Called with the wrong type")
-    return [rdfvalue.DummyRDFValue2(str(value) + "B")]
+    return [rdfvalue.DummyRDFValue2(f"{str(value)}B")]
 
 
 class DummyRDFValue4ToMetadataConverter(export.ExportConverter):
@@ -91,7 +91,7 @@ class DummyRDFValue5Converter(export.ExportConverter):
     _ = token
     if not isinstance(value, DummyRDFValue5):
       raise ValueError("Called with the wrong type")
-    return [rdfvalue.DummyRDFValue5(str(value) + "C")]
+    return [rdfvalue.DummyRDFValue5(f"{str(value)}C")]
 
 
 class ExportTest(test_lib.GRRBaseTest):
@@ -808,9 +808,8 @@ class ExportTest(test_lib.GRRBaseTest):
     msg.source = rdfvalue.ClientURN("C.0000000000000000")
     test_lib.ClientFixture(msg.source, token=self.token)
 
-    metadata = rdfvalue.ExportedMetadata(
-        source_urn=rdfvalue.RDFURN("aff4:/hunts/" + str(queues.HUNTS) +
-                                   ":000000/Results"))
+    metadata = rdfvalue.ExportedMetadata(source_urn=rdfvalue.RDFURN(
+        f"aff4:/hunts/{str(queues.HUNTS)}:000000/Results"))
 
     converter = export.GrrMessageConverter()
     with test_lib.FakeTime(2):
@@ -822,7 +821,7 @@ class ExportTest(test_lib.GRRBaseTest):
     self.assertEqual(results[0].timestamp,
                      rdfvalue.RDFDatetime().FromSecondsFromEpoch(2))
     self.assertEqual(results[0].source_urn,
-                     "aff4:/hunts/"+ str(queues.HUNTS) + ":000000/Results")
+                     f"aff4:/hunts/{str(queues.HUNTS)}:000000/Results")
 
   def testGrrMessageConverterWithOneMissingClient(self):
     payload1 = DummyRDFValue4(
@@ -836,12 +835,10 @@ class ExportTest(test_lib.GRRBaseTest):
     msg2 = rdfvalue.GrrMessage(payload=payload2)
     msg2.source = rdfvalue.ClientURN("C.0000000000000001")
 
-    metadata1 = rdfvalue.ExportedMetadata(
-        source_urn=rdfvalue.RDFURN("aff4:/hunts/" + str(queues.HUNTS) +
-                                   ":000000/Results"))
-    metadata2 = rdfvalue.ExportedMetadata(
-        source_urn=rdfvalue.RDFURN("aff4:/hunts/" + str(queues.HUNTS) +
-                                   ":000001/Results"))
+    metadata1 = rdfvalue.ExportedMetadata(source_urn=rdfvalue.RDFURN(
+        f"aff4:/hunts/{str(queues.HUNTS)}:000000/Results"))
+    metadata2 = rdfvalue.ExportedMetadata(source_urn=rdfvalue.RDFURN(
+        f"aff4:/hunts/{str(queues.HUNTS)}:000001/Results"))
 
     converter = export.GrrMessageConverter()
     with test_lib.FakeTime(3):
@@ -853,8 +850,8 @@ class ExportTest(test_lib.GRRBaseTest):
                      rdfvalue.RDFDatetime().FromSecondsFromEpoch(1))
     self.assertEqual(results[0].timestamp,
                      rdfvalue.RDFDatetime().FromSecondsFromEpoch(3))
-    self.assertEqual(results[0].source_urn, "aff4:/hunts/" + str(queues.HUNTS) +
-                     ":000000/Results")
+    self.assertEqual(results[0].source_urn,
+                     f"aff4:/hunts/{str(queues.HUNTS)}:000000/Results")
 
   def testGrrMessageConverterMultipleTypes(self):
     payload1 = DummyRDFValue3(
@@ -868,12 +865,10 @@ class ExportTest(test_lib.GRRBaseTest):
     msg2 = rdfvalue.GrrMessage(payload=payload2)
     msg2.source = rdfvalue.ClientURN("C.0000000000000000")
 
-    metadata1 = rdfvalue.ExportedMetadata(
-        source_urn=rdfvalue.RDFURN("aff4:/hunts/" + str(queues.HUNTS) +
-                                   ":000000/Results"))
-    metadata2 = rdfvalue.ExportedMetadata(
-        source_urn=rdfvalue.RDFURN("aff4:/hunts/" + str(queues.HUNTS) +
-                                   ":000001/Results"))
+    metadata1 = rdfvalue.ExportedMetadata(source_urn=rdfvalue.RDFURN(
+        f"aff4:/hunts/{str(queues.HUNTS)}:000000/Results"))
+    metadata2 = rdfvalue.ExportedMetadata(source_urn=rdfvalue.RDFURN(
+        f"aff4:/hunts/{str(queues.HUNTS)}:000001/Results"))
 
     converter = export.GrrMessageConverter()
     with test_lib.FakeTime(3):

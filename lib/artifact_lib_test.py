@@ -73,8 +73,8 @@ class ArtifactHandlingTest(test_lib.GRRBaseTest):
         os_name="Windows", provides=["users.homedir", "domain"])
     for result in results:
       # provides contains at least one of the filter strings
-      self.assertTrue(len(set(result.provides).union(set(["users.homedir",
-                                                          "domain"]))) >= 1)
+      self.assertTrue(
+          len(set(result.provides).union({"users.homedir", "domain"})) >= 1)
 
     results = artifact_lib.ArtifactRegistry.GetArtifacts(
         os_name="Windows", provides=["nothingprovidesthis"])
@@ -88,11 +88,11 @@ class ArtifactHandlingTest(test_lib.GRRBaseTest):
     results_names = artifact_lib.ArtifactRegistry.GetArtifactNames(
         os_name="Windows", provides=["users.homedir", "domain"])
 
-    self.assertItemsEqual(set([a.name for a in result_objs]), results_names)
+    self.assertItemsEqual({a.name for a in result_objs}, results_names)
 
     results_names = artifact_lib.ArtifactRegistry.GetArtifactNames(
         os_name="Darwin", provides=["users.username", "domain"])
-    self.assertItemsEqual(set(["OSXUsers"]), results_names)
+    self.assertItemsEqual({"OSXUsers"}, results_names)
 
   def testSearchDependencies(self):
     with utils.Stubber(artifact_lib.ArtifactRegistry, "artifacts", {}):
@@ -216,14 +216,13 @@ class ArtifactParserTest(test_lib.GRRBaseTest):
     for processor in parsers.Parser.classes.values():
       if (not hasattr(processor, "output_types") or
           not isinstance(processor.output_types, (list, tuple))):
-        raise parsers.ParserDefinitionError("Missing output_types on %s" %
-                                            processor)
+        raise parsers.ParserDefinitionError(f"Missing output_types on {processor}")
 
       for output_type in processor.output_types:
         if not hasattr(rdfvalue, output_type):
           raise parsers.ParserDefinitionError(
-              "Parser %s has an output type that is an unknown type %s" %
-              (processor, output_type))
+              f"Parser {processor} has an output type that is an unknown type {output_type}"
+          )
 
 
 class KnowledgeBaseUserMergeTest(test_lib.GRRBaseTest):

@@ -30,7 +30,7 @@ class ThreadPoolTest(test_lib.GRRBaseTest):
     super(ThreadPoolTest, self).setUp()
     self.base_thread_count = threading.active_count()
 
-    prefix = "pool-%s" % self._testMethodName
+    prefix = f"pool-{self._testMethodName}"
     self.test_pool = threadpool.ThreadPool.Factory(
         prefix, self.NUMBER_OF_THREADS, max_threads=self.MAXIMUM_THREADS)
     self.test_pool.Start()
@@ -42,8 +42,7 @@ class ThreadPoolTest(test_lib.GRRBaseTest):
   def WaitUntil(self, condition_cb, timeout=5):
     """Wait a fixed time until the condition is true."""
     for _ in range(int(timeout / self.sleep_time)):
-      res = condition_cb()
-      if res:
+      if res := condition_cb():
         return res
 
       time.sleep(self.sleep_time)
@@ -129,8 +128,7 @@ class ThreadPoolTest(test_lib.GRRBaseTest):
 
     # Make sure that both exceptions have been counted.
     self.assertEqual(
-        stats.STATS.GetMetricValue(self.test_pool.name + "_task_exceptions"),
-        2)
+        stats.STATS.GetMetricValue(f"{self.test_pool.name}_task_exceptions"), 2)
 
   def testFailToCreateThread(self):
     """Test that we handle thread creation problems ok."""
@@ -328,7 +326,7 @@ class DummyConverter(threadpool.BatchConverter):
 
     self.batches.append(batch)
     self.threads.append(threading.current_thread().ident)
-    self.results.extend([s + "*" for s in batch])
+    self.results.extend([f"{s}*" for s in batch])
 
 
 class BatchConverterTest(test_lib.GRRBaseTest):
@@ -349,7 +347,7 @@ class BatchConverterTest(test_lib.GRRBaseTest):
 
     self.assertEqual(len(converter.results), 10)
     for i, r in enumerate(sorted(converter.results)):
-      self.assertEqual(r, str(i) + "*")
+      self.assertEqual(r, f"{str(i)}*")
 
   def testSingleThreadedConverter(self):
     converter = DummyConverter(threadpool_size=0, batch_size=2, sleep_time=0,
@@ -366,7 +364,7 @@ class BatchConverterTest(test_lib.GRRBaseTest):
 
     self.assertEqual(len(converter.results), 10)
     for i, r in enumerate(sorted(converter.results)):
-      self.assertEqual(r, str(i) + "*")
+      self.assertEqual(r, f"{str(i)}*")
 
 
 def main(argv):

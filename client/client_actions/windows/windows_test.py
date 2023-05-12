@@ -147,7 +147,7 @@ class RegistryFake(test_lib.FakeRegistryVFSHandler):
     res = "%s/%s" % (key.value, sub_key.replace("\\", "/"))
     res = res.lower().rstrip("/")
     if not res.startswith("/"):
-      res = "/" + res
+      res = f"/{res}"
     if res in self.cache[self.prefix]:
       return FakeKeyHandle(res)
     raise IOError()
@@ -156,8 +156,7 @@ class RegistryFake(test_lib.FakeRegistryVFSHandler):
     full_key = os.path.join(key.value, value_name).rstrip("/")
     try:
       stat_entry = self.cache[self.prefix][full_key][1]
-      data = stat_entry.registry_data.GetValue()
-      if data:
+      if data := stat_entry.registry_data.GetValue():
         return data, str
     except KeyError:
       pass

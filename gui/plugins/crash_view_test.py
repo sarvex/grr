@@ -68,7 +68,7 @@ class TestCrashView(test_lib.GRRSeleniumTest):
         "Client killed during transaction"])
 
     # Click on a session id link and check that we're redirected to a flow.
-    self.Click("css=a:contains('%s/flows')" % self.client_id)
+    self.Click(f"css=a:contains('{self.client_id}/flows')")
     self.WaitUntil(self.AllTextsPresent, [
         "Manage launched flows", "Flow Name", "Flow Information"])
 
@@ -105,8 +105,7 @@ class TestCrashView(test_lib.GRRSeleniumTest):
 
     # Check that all crashed are registered in "All Clients Crashes"
     self.Click("css=a[grrtarget=GlobalCrashesRenderer]")
-    self.WaitUntil(self.AllTextsPresent,
-                   [client_id for client_id in client_ids])
+    self.WaitUntil(self.AllTextsPresent, list(client_ids))
 
     # Go to hunt manager and select a hunt.
     self.Click("css=a[grrtarget=ManageHunts]")
@@ -117,8 +116,7 @@ class TestCrashView(test_lib.GRRSeleniumTest):
     self.Click("css=li[heading=Crashes]")
 
     # Check that all crashes were registered for this hunt.
-    self.WaitUntil(self.AllTextsPresent,
-                   [client_id for client_id in client_ids])
+    self.WaitUntil(self.AllTextsPresent, list(client_ids))
 
     # Search for the C.0000000000000001 and select it.
     self.Type("client_query", "0001")

@@ -54,10 +54,7 @@ class Parser(object):
 
   @classmethod
   def GetDescription(cls):
-    if cls.__doc__:
-      return cls.__doc__.split("\n")[0]
-    else:
-      return ""
+    return cls.__doc__.split("\n")[0] if cls.__doc__ else ""
 
   @classmethod
   def Validate(cls):
@@ -73,11 +70,10 @@ class Parser(object):
         raise ParserDefinitionError("Artifact parser %s has an invalid output "
                                     "type %s." % (cls.__name__, out_type))
 
-    if cls.process_together:
-      if not hasattr(cls, "ParseMultiple"):
-        raise ParserDefinitionError("Parser %s has set process_together, but "
-                                    "has not defined a ParseMultiple method." %
-                                    cls.__name__)
+    if cls.process_together and not hasattr(cls, "ParseMultiple"):
+      raise ParserDefinitionError(
+          f"Parser {cls.__name__} has set process_together, but has not defined a ParseMultiple method."
+      )
 
 
 class CommandParser(Parser):

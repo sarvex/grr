@@ -77,10 +77,7 @@ class IterateAllClientUrns(object):
 
     while count >= 0:
       try:
-        # We only use the timeout to wait if we got to the end of the Queue but
-        # didn't process everything yet.
-        out = self.out_queue.get(timeout=self.QUEUE_TIMEOUT, block=True)
-        if out:
+        if out := self.out_queue.get(timeout=self.QUEUE_TIMEOUT, block=True):
           yield out
           count -= 1
       except Queue.Empty:
@@ -134,19 +131,18 @@ def DownloadFile(file_obj, target_path, buffer_size=BUFFER_SIZE):
   """
   logging.info(u"Downloading: %s to: %s", file_obj.urn, target_path)
 
-  target_file = open(target_path, "w")
-  file_obj.Seek(0)
-  count = 0
+  with open(target_path, "w") as target_file:
+    file_obj.Seek(0)
+    count = 0
 
-  data_buffer = file_obj.Read(buffer_size)
-  while data_buffer:
-    target_file.write(data_buffer)
     data_buffer = file_obj.Read(buffer_size)
-    count += 1
-    if not count % 3:
-      logging.debug(u"Downloading: %s: %s done", file_obj.urn,
-                    utils.FormatNumberAsString(count * buffer_size))
-  target_file.close()
+    while data_buffer:
+      target_file.write(data_buffer)
+      data_buffer = file_obj.Read(buffer_size)
+      count += 1
+      if not count % 3:
+        logging.debug(u"Downloading: %s: %s done", file_obj.urn,
+                      utils.FormatNumberAsString(count * buffer_size))
 
 
 def RecursiveDownload(dir_obj, target_dir, max_depth=10, depth=1,
@@ -274,10 +270,7 @@ def DownloadCollection(coll_path, target_path, token=None, overwrite=False,
 
     # Now queue downloading the actual files.
     args = (urn, target_path, token, overwrite)
-    if flatten:
-      target = CopyAndSymlinkAFF4ToLocal
-    else:
-      target = CopyAFF4ToLocal
+    target = CopyAndSymlinkAFF4ToLocal if flatten else CopyAFF4ToLocal
     thread_pool.AddTask(target=target, args=args, name="Downloader")
 
   # Join and stop the threadpool.
@@ -339,9 +332,10 @@ def CopyAFF4ToLocal(aff4_urn, target_dir, token=None, overwrite=False):
 
 def CopyAndSymlinkAFF4ToLocal(aff4_urn, target_dir, token=None,
                               overwrite=False):
-  path = CopyAFF4ToLocal(aff4_urn, target_dir, token=token,
-                         overwrite=overwrite)
-  if path:
+  if path := CopyAFF4ToLocal(aff4_urn,
+                             target_dir,
+                             token=token,
+                             overwrite=overwrite):
     files_output_dir = os.path.join(target_dir, "files")
     try:
       os.makedirs(files_output_dir)

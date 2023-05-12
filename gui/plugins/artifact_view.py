@@ -90,7 +90,7 @@ class ArtifactListRenderer(forms.MultiSelectListRenderer):
     self.artifacts = {}
     artifact.LoadArtifactsFromDatastore(token=request.token)
     for name, artifact_val in artifact_lib.ArtifactRegistry.artifacts.items():
-      if set(["Bootstrap"]).isdisjoint(artifact_val.labels):
+      if {"Bootstrap"}.isdisjoint(artifact_val.labels):
         self.artifacts[name] = artifact_val
     self.labels = artifact_lib.ARTIFACT_LABELS
 
@@ -98,11 +98,11 @@ class ArtifactListRenderer(forms.MultiSelectListRenderer):
     artifact_dict = {}
     for artifact_name, artifact_val in self.artifacts.items():
       artifact_dict[artifact_name] = artifact_val.ToExtendedDict()
-      processors = []
-      for processor in parsers.Parser.GetClassesByArtifact(artifact_name):
-        processors.append({"name": processor.__name__,
-                           "output_types": processor.output_types,
-                           "doc": processor.GetDescription()})
+      processors = [{
+          "name": processor.__name__,
+          "output_types": processor.output_types,
+          "doc": processor.GetDescription(),
+      } for processor in parsers.Parser.GetClassesByArtifact(artifact_name)]
       artifact_dict[artifact_name]["processors"] = processors
 
     # Skip the our parent and call the TypeDescriptorFormRenderer direct.
@@ -176,7 +176,7 @@ class ArtifactManagerView(renderers.TableRenderer):
 
     self.size = len(collection)
     row_index = start_row
-    for value in itertools.islice(collection, start_row, end_row):
+    for value in itertools.islice(collection, row_index, end_row):
       self.AddCell(row_index, "Artifact Name", value.name)
       self.AddCell(row_index, "Artifact Details", value)
       self.AddCell(row_index, "Artifact Raw", value)
@@ -295,6 +295,6 @@ class ArtifactUploadHandler(fileview.UploadHandler):
       return renderers.TemplateRenderer.Layout(self, request, response,
                                                self.success_template)
     except (IOError, artifact_lib.ArtifactDefinitionError) as e:
-      self.error = "Could not write artifact to database %s" % e
+      self.error = f"Could not write artifact to database {e}"
     return renderers.TemplateRenderer.Layout(self, request, response,
                                              self.error_template)

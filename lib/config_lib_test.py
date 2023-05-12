@@ -404,7 +404,7 @@ Section1.test: 2
 
     # Check our actual config validates
     configpath = os.path.normpath(
-        os.path.dirname(__file__) + "/../config/grr-server.yaml")
+        f"{os.path.dirname(__file__)}/../config/grr-server.yaml")
     conf.Initialize(filename=configpath)
 
   def _DefineStringName(self, conf, name):

@@ -103,8 +103,9 @@ class RDFValueCollection(aff4.AFF4Object):
         raise ValueError("RDFValueCollection doesn't accept None values.")
 
     if self._rdf_type and not isinstance(rdf_value, self._rdf_type):
-      raise ValueError("This collection only accepts values of type %s" %
-                       self._rdf_type.__name__)
+      raise ValueError(
+          f"This collection only accepts values of type {self._rdf_type.__name__}"
+      )
 
     if not rdf_value.age:
       rdf_value.age.Now()
@@ -124,8 +125,9 @@ class RDFValueCollection(aff4.AFF4Object):
         raise ValueError("Can't add None to the collection via AddAll.")
 
       if self._rdf_type and not isinstance(rdf_value, self._rdf_type):
-        raise ValueError("This collection only accepts values of type %s" %
-                         self._rdf_type.__name__)
+        raise ValueError(
+            f"This collection only accepts values of type {self._rdf_type.__name__}"
+        )
 
       if not rdf_value.age:
         rdf_value.age.Now()
@@ -218,12 +220,11 @@ class RDFValueCollection(aff4.AFF4Object):
       return item
 
   def __getitem__(self, index):
-    if index >= 0:
-      for i, item in enumerate(self):
-        if i == index:
-          return item
-    else:
+    if index < 0:
       raise RuntimeError("Index must be >= 0")
+    for i, item in enumerate(self):
+      if i == index:
+        return item
 
 
 class AFF4Collection(aff4.AFF4Volume, RDFValueCollection):
@@ -374,13 +375,11 @@ class VersionedCollection(RDFValueCollection):
     if timestamp is None:
       timestamp = data_store.DB.ALL_TIMESTAMPS
 
-    index = 0
-    for _, value, ts in data_store.DB.ResolveMulti(
+    for index, (_, value, ts) in enumerate(data_store.DB.ResolveMulti(
         self.urn, [self.Schema.DATA.predicate], token=self.token,
-        timestamp=timestamp):
+        timestamp=timestamp)):
       if index >= offset:
         yield self.Schema.DATA(value, age=ts).payload
-      index += 1
 
 
 class PackedVersionedCollection(RDFValueCollection):
@@ -445,8 +444,9 @@ class PackedVersionedCollection(RDFValueCollection):
         raise ValueError("Can't add None to the collection.")
 
       if cls._rdf_type and not isinstance(rdf_value, cls._rdf_type):
-        raise ValueError("This collection only accepts values of type %s" %
-                         cls._rdf_type.__name__)
+        raise ValueError(
+            f"This collection only accepts values of type {cls._rdf_type.__name__}"
+        )
 
       if not rdf_value.age:
         rdf_value.age.Now()
@@ -532,8 +532,9 @@ class PackedVersionedCollection(RDFValueCollection):
         raise ValueError("Can't add None to the collection via AddAll.")
 
       if self._rdf_type and not isinstance(rdf_value, self._rdf_type):
-        raise ValueError("This collection only accepts values of type %s" %
-                         self._rdf_type.__name__)
+        raise ValueError(
+            f"This collection only accepts values of type {self._rdf_type.__name__}"
+        )
 
       if not rdf_value.age:
         rdf_value.age.Now()
@@ -552,25 +553,24 @@ class PackedVersionedCollection(RDFValueCollection):
 
   def GenerateUncompactedItems(self, max_reversed_results=0,
                                timestamp=None):
-    if self.IsAttributeSet(self.Schema.DATA):
-      freeze_timestamp = timestamp or rdfvalue.RDFDatetime().Now()
-      results = []
-      for _, value, _ in data_store.DB.ResolveRegex(
+    if not self.IsAttributeSet(self.Schema.DATA):
+      return
+    freeze_timestamp = timestamp or rdfvalue.RDFDatetime().Now()
+    results = []
+    for _, value, _ in data_store.DB.ResolveRegex(
           self.urn, self.Schema.DATA.predicate, token=self.token,
           timestamp=(0, freeze_timestamp)):
 
-        if results is not None:
-          results.append(self.Schema.DATA(value).payload)
-          if max_reversed_results and len(results) > max_reversed_results:
-            for result in results:
-              yield result
-            results = None
-        else:
-          yield self.Schema.DATA(value).payload
-
       if results is not None:
-        for result in reversed(results):
-          yield result
+        results.append(self.Schema.DATA(value).payload)
+        if max_reversed_results and len(results) > max_reversed_results:
+          yield from results
+          results = None
+      else:
+        yield self.Schema.DATA(value).payload
+
+    if results is not None:
+      yield from reversed(results)
 
   def GenerateItems(self, offset=0):
     """First iterate over the versions, and then iterate over the stream."""

@@ -36,7 +36,7 @@ class ActionMock(object):
     self.action_classes = dict(
         [(k, v) for (k, v) in actions.ActionPlugin.classes.items()
          if k in action_names])
-    self.action_counts = dict((x, 0) for x in action_names)
+    self.action_counts = {x: 0 for x in action_names}
 
     # Create a single long lived client worker mock.
     self.client_worker = worker_mocks.FakeClientWorker()
@@ -204,7 +204,7 @@ class InterrogatedClient(ActionMock):
 
   def GetUserInfo(self, user):
     self.response_count += 1
-    user.homedir = "/usr/local/home/%s" % user.username
+    user.homedir = f"/usr/local/home/{user.username}"
     user.full_name = user.username.capitalize()
     return [user]
 
@@ -229,7 +229,7 @@ class InterrogatedClient(ActionMock):
           try:
             rdf_dict[key] = value
           except TypeError:
-            rdf_dict[key] = "Failed to encode: %s" % value
+            rdf_dict[key] = f"Failed to encode: {value}"
       return [rdf_dict]
     else:
       return None

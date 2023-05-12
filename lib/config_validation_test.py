@@ -23,9 +23,7 @@ def ValidateConfig(config_file=None):
     conf_obj.Initialize(config_file, reset=True)
 
   all_sections = conf_obj.GetSections()
-  errors = conf_obj.Validate(sections=all_sections)
-
-  return errors
+  return conf_obj.Validate(sections=all_sections)
 
 
 class BuildConfigTests(test_lib.GRRBaseTest):
@@ -54,15 +52,14 @@ class BuildConfigTests(test_lib.GRRBaseTest):
       if os.access(cfg_file, os.R_OK):
         configs.append(cfg_file)
       else:
-        logging.info(
-            "Skipping checking %s, you probably need to be root" % cfg_file)
+        logging.info(f"Skipping checking {cfg_file}, you probably need to be root")
 
     test_filter_map = config_lib.ConfigFilter.classes_by_name
     for filter_name in self.disabled_filters:
       test_filter_map[filter_name] = config_lib.ConfigFilter
 
     with utils.Stubber(config_lib.ConfigFilter, "classes_by_name",
-                       test_filter_map):
+                         test_filter_map):
       for config_file in configs:
         errors = ValidateConfig(config_file)
 
@@ -70,8 +67,7 @@ class BuildConfigTests(test_lib.GRRBaseTest):
           errors.pop(exception, None)
 
         if errors:
-          self.fail("Validation of %s returned errors: %s" % (
-              config_file, errors))
+          self.fail(f"Validation of {config_file} returned errors: {errors}")
 
 
 def main(argv):

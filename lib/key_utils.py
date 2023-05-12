@@ -13,10 +13,7 @@ from M2Crypto import X509
 
 def GenerateRSAKey(passphrase=None, key_length=2048):
   """Generate an RSA key and return tuple of pem strings for (priv,pub) keys."""
-  if passphrase is not None:
-    passphrase_cb = lambda: passphrase
-  else:
-    passphrase_cb = None
+  passphrase_cb = (lambda: passphrase) if passphrase is not None else None
   key = RSA.gen_key(key_length, 65537)
   priv_key = key.as_pem(passphrase_cb)
   bio = BIO.MemoryBuffer()

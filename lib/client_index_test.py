@@ -36,11 +36,13 @@ class ClientIndexTest(test_lib.AFF4ObjectTest):
                                 aff4_type="ClientIndex",
                                 mode="rw",
                                 token=self.token)
-    test_lib.ClientFixture("aff4:/" + CLIENT_ID, token=self.token)
-    client = aff4.FACTORY.Create("aff4:/" + CLIENT_ID,
-                                 aff4_type="VFSGRRClient",
-                                 mode="rw",
-                                 token=self.token)
+    test_lib.ClientFixture(f"aff4:/{CLIENT_ID}", token=self.token)
+    client = aff4.FACTORY.Create(
+        f"aff4:/{CLIENT_ID}",
+        aff4_type="VFSGRRClient",
+        mode="rw",
+        token=self.token,
+    )
     _, keywords = index.AnalyzeClient(client)
 
     # Should not contain an empty string.

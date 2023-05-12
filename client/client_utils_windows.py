@@ -46,9 +46,8 @@ def CanonicalPathToLocalPath(path):
   # Account for raw devices
   path = path.replace("/\\", "\\")
   path = path.replace("/", "\\")
-  m = re.match(r"\\([a-zA-Z]):(.*)$", path)
-  if m:
-    path = "%s:\\%s" % (m.group(1), m.group(2).lstrip("\\"))
+  if m := re.match(r"\\([a-zA-Z]):(.*)$", path):
+    path = "%s:\\%s" % (m[1], m[2].lstrip("\\"))
 
   return path
 
@@ -94,7 +93,7 @@ def WinChmod(filename, acl_list, user=None):
     user = win32api.GetUserName()
 
   if not os.path.exists(filename):
-    raise RuntimeError("filename %s does not exist" % filename)
+    raise RuntimeError(f"filename {filename} does not exist")
 
   acl_bitmask = 0
   for acl in acl_list:
@@ -146,10 +145,8 @@ def WinFindProxies():
       internet_settings = _winreg.OpenKey(_winreg.HKEY_USERS,
                                           subkey)
 
-      proxy_enable = _winreg.QueryValueEx(internet_settings,
-                                          "ProxyEnable")[0]
-
-      if proxy_enable:
+      if proxy_enable := _winreg.QueryValueEx(internet_settings,
+                                              "ProxyEnable")[0]:
         # Returned as Unicode but problems if not converted to ASCII
         proxy_server = str(_winreg.QueryValueEx(internet_settings,
                                                 "ProxyServer")[0])
@@ -160,15 +157,13 @@ def WinFindProxies():
             # See if address has a type:// prefix
 
             if not re.match("^([^/:]+)://", address):
-              address = "%s://%s" % (protocol, address)
+              address = f"{protocol}://{address}"
 
             proxies.append(address)
+        elif proxy_server.startswith("http:"):
+          proxies.append(proxy_server)
         else:
-          # Use one setting for all protocols
-          if proxy_server[:5] == "http:":
-            proxies.append(proxy_server)
-          else:
-            proxies.append("http://%s" % proxy_server)
+          proxies.append(f"http://{proxy_server}")
 
       internet_settings.Close()
 
@@ -209,7 +204,7 @@ def WinGetRawDevice(path):
   if not path.startswith(mount_point):
     stripped_mp = mount_point.rstrip("\\")
     if not path.startswith(stripped_mp):
-      raise IOError("path %s is not mounted under %s" % (path, mount_point))
+      raise IOError(f"path {path} is not mounted under {mount_point}")
 
   corrected_path = LocalPathToCanonicalPath(path[len(mount_point):])
   corrected_path = utils.NormalizePath(corrected_path)

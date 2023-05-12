@@ -20,10 +20,10 @@ class TestNetstat(base.AutomatedTest):
     connections = netstat.Get(netstat.Schema.CONNECTIONS)
     self.assertGreater(len(connections), 5)
     # There should be at least two local IPs.
-    num_ips = set([k.local_address.ip for k in connections])
+    num_ips = {k.local_address.ip for k in connections}
     self.assertGreater(len(num_ips), 1)
     # There should be at least two different connection states.
-    num_states = set([k.state for k in connections])
+    num_states = {k.state for k in connections}
     # This is a known issue on CentOS so we just warn about it.
     if len(num_states) <= 1:
       logging.warning("Only received one distinct connection state!")

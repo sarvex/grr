@@ -65,15 +65,10 @@ class ConfigurationTree(renderers.TreeRenderer):
                                       token=request.token)
       children = list(directory.ListChildren(limit=100000))
       infos = aff4.FACTORY.Stat(children, token=request.token)
-      info_by_urn = {}
-      for info in infos:
-        info_by_urn[info["urn"]] = info
-
+      info_by_urn = {info["urn"]: info for info in infos}
       for child_urn in children:
-        info = info_by_urn.get(child_urn)
-        if info:
-          typeinfo = info.get("type")
-          if typeinfo:
+        if info := info_by_urn.get(child_urn):
+          if typeinfo := info.get("type"):
             class_name = typeinfo[1]
             cls = aff4.AFF4Object.classes.get(class_name)
             if cls and "Container" not in cls.behaviours:
@@ -81,7 +76,7 @@ class ConfigurationTree(renderers.TreeRenderer):
         self.AddElement(child_urn.RelativeName(urn))
 
     except IOError as e:
-      self.message = "Error fetching %s: %s" % (urn, e)
+      self.message = f"Error fetching {urn}: {e}"
 
 
 class ConfigFileTable(fileview.AbstractFileTable):
@@ -128,8 +123,7 @@ class ConfigDescriptionColumn(renderers.TableColumn):
     """Add a new value from the fd customizing for the type."""
     for attr in self.attrs:
       if fd.IsAttributeSet(attr):
-        val = fd.Get(attr)
-        if val:
+        if val := fd.Get(attr):
           self.rows[index] = val
           break
 
@@ -218,8 +212,8 @@ class ConfigBinaryUploadHandler(fileview.UploadHandler):
 
       return renderers.TemplateRenderer.Layout(self, request, response,
                                                self.success_template)
-    except (IOError) as e:
-      self.error = "Could not write file to database %s" % e
+    except IOError as e:
+      self.error = f"Could not write file to database {e}"
     except (IndexError) as e:
       self.error = "No file provided."
     except message.DecodeError as e:
@@ -234,11 +228,10 @@ class ConfigBinaryUploadHandler(fileview.UploadHandler):
       raise IOError("No tree_path specified")
 
     aff4_path = rdfvalue.RDFURN(aff4_path).Add(self.uploaded_file.name)
-    bin_type = maintenance_utils.GetConfigBinaryPathType(aff4_path)
-    if not bin_type:
-      raise IOError("Cannot upload to this path")
-    else:
+    if bin_type := maintenance_utils.GetConfigBinaryPathType(aff4_path):
       return (aff4_path, bin_type)
+    else:
+      raise IOError("Cannot upload to this path")
 
 
 class ConfigurationViewInitHook(registry.InitHook):

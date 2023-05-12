@@ -46,13 +46,12 @@ class TestACLWorkflow(test_lib.GRRSeleniumTest):
       try:
         fd = aff4.FACTORY.Open(user, "GRRUser", mode="r", ignore_cache=True,
                                token=self.token)
-        pending_notifications = fd.Get(fd.Schema.PENDING_NOTIFICATIONS)
-        if pending_notifications:
+        if pending_notifications := fd.Get(fd.Schema.PENDING_NOTIFICATIONS):
           return
       except IOError:
         pass
       time.sleep(sleep_time)
-    self.fail("Notification for user %s never sent." % user)
+    self.fail(f"Notification for user {user} never sent.")
 
   def testClientACLWorkflow(self):
     self.Open("/")
@@ -151,7 +150,7 @@ class TestACLWorkflow(test_lib.GRRSeleniumTest):
     # Choose client 6
     self.Click("css=td:contains('0006')")
 
-    self.WaitUntil(self.IsTextPresent, u"Access reason: %s" % test_reason)
+    self.WaitUntil(self.IsTextPresent, f"Access reason: {test_reason}")
 
     # By now we should have a recent reason set, let's see if it shows up in the
     # ACL dialog.
@@ -252,7 +251,7 @@ class TestACLWorkflow(test_lib.GRRSeleniumTest):
 
     self.Click("css=button:contains('Approve')")
     self.WaitUntil(self.IsTextPresent,
-                   "You have granted access for %s to test" % hunt_id)
+                   f"You have granted access for {hunt_id} to test")
 
     self.WaitForNotification("aff4:/users/test")
     self.Open("/")
@@ -635,8 +634,8 @@ class TestACLWorkflow(test_lib.GRRSeleniumTest):
 
     # Extract link from the message text and open it.
     m = re.search(r"href='(.+?)'", messages_sent[0], re.MULTILINE)
-    link = urlparse.urlparse(m.group(1))
-    self.Open(link.path + "?" + link.query + "#" + link.fragment)
+    link = urlparse.urlparse(m[1])
+    self.Open(f"{link.path}?{link.query}#{link.fragment}")
 
     # Check that requestor's username and  reason are correctly displayed.
     self.WaitUntil(self.IsTextPresent, "iwantapproval")

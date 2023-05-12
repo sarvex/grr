@@ -47,7 +47,7 @@ class MockVFSHandlerFind(vfs.VFSHandler):
       if isinstance(self.content, str):
         self.size = len(self.content)
     except KeyError:
-      raise IOError("not mocking %s" % self.path)
+      raise IOError(f"not mocking {self.path}")
 
   def Read(self, length):
     # Reading the mocked directory raises.
@@ -202,10 +202,10 @@ class FindTest(test_lib.EmptyActionTest):
 
     request.iterator.number = 200
     results = self.RunAction("Find", request)
-    all_files = []
-    for result in results:
-      if isinstance(result, rdfvalue.FindSpec):
-        all_files.append(result.hit.pathspec.Basename())
+    all_files = [
+        result.hit.pathspec.Basename() for result in results
+        if isinstance(result, rdfvalue.FindSpec)
+    ]
     self.assertEqual(len(all_files), 5)
 
     for filename in all_files:

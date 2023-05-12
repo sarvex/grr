@@ -62,12 +62,11 @@ class ApiConfigRenderer(api_call_renderers.ApiCallRenderer):
             if isinstance(option_value, rdfvalue.RDFValue):
               option_value = api_value_renderers.RenderValue(
                   option_value, with_types=True, with_metadata=True)
+            elif isinstance(option_value, str):
+              raw_value = option_value = None
+              value_type = "binary"
             else:
-              if isinstance(option_value, str):
-                raw_value = option_value = None
-                value_type = "binary"
-              else:
-                option_value = utils.SmartUnicode(option_value)
+              option_value = utils.SmartUnicode(option_value)
 
             interpolated_value = config_lib.CONFIG.InterpolateValue(raw_value)
             is_expanded = option_value != interpolated_value

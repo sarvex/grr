@@ -33,9 +33,8 @@ class TestNewHuntWizard(test_lib.GRRSeleniumTest):
     hunt_rules = []
     rules = fman.Get(fman.Schema.RULES, [])
     for rule in rules:
-      for action in rule.actions:
-        if action.hunt_id == hunt.urn:
-          hunt_rules.append(rule)
+      hunt_rules.extend(rule for action in rule.actions
+                        if action.hunt_id == hunt.urn)
     return hunt_rules
 
   @staticmethod
@@ -128,8 +127,10 @@ class TestNewHuntWizard(test_lib.GRRSeleniumTest):
     # Configure the hunt to send an email on results.
     self.Select("css=.Wizard select[id=output_1-option]",
                 "Send an email for each result.")
-    self.Type("css=.Wizard input[id=output_1-email_address]",
-              "test@%s" % config_lib.CONFIG["Logging.domain"])
+    self.Type(
+        "css=.Wizard input[id=output_1-email_address]",
+        f'test@{config_lib.CONFIG["Logging.domain"]}',
+    )
 
     # Click on "Next" button
     self.Click("css=.Wizard button.Next")
@@ -194,8 +195,8 @@ $("button:contains('Add Rule')").parent().scrollTop(10000)
 
     # Check that output plugins are shown.
     self.assertTrue(self.IsTextPresent("EmailOutputPlugin"))
-    self.assertTrue(self.IsTextPresent("test@%s" %
-                                       config_lib.CONFIG["Logging.domain"]))
+    self.assertTrue(
+        self.IsTextPresent(f'test@{config_lib.CONFIG["Logging.domain"]}'))
 
     # Check that rules summary is present.
     self.assertTrue(self.IsTextPresent("Regex rules"))
@@ -220,8 +221,8 @@ $("button:contains('Add Rule')").parent().scrollTop(10000)
     self.assertTrue(self.IsTextPresent("/tmp"))
 
     self.assertTrue(self.IsTextPresent("EmailOutputPlugin"))
-    self.assertTrue(self.IsTextPresent("test@%s" %
-                                       config_lib.CONFIG["Logging.domain"]))
+    self.assertTrue(
+        self.IsTextPresent(f'test@{config_lib.CONFIG["Logging.domain"]}'))
 
     # Check that the hunt object was actually created
     hunts_root = aff4.FACTORY.Open("aff4:/hunts", token=self.token)
@@ -435,8 +436,10 @@ $("button:contains('Add Rule')").parent().scrollTop(10000)
         flows_count = len(list(aff4.FACTORY.Open(
             client_id.Add("flows"), token=self.token).ListChildren()))
 
-        if (client_id == rdfvalue.ClientURN("C.0000000000000001") or
-            client_id == rdfvalue.ClientURN("C.0000000000000007")):
+        if client_id in [
+            rdfvalue.ClientURN("C.0000000000000001"),
+            rdfvalue.ClientURN("C.0000000000000007"),
+        ]:
           self.assertEqual(flows_count, 1)
         else:
           self.assertEqual(flows_count, 0)

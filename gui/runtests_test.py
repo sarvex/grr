@@ -26,7 +26,7 @@ class SeleniumTestProgram(test_lib.GrrTestProgram):
     # This is very expensive to start up - we make it a class attribute so it
     # can be shared with all the classes.
     test_lib.GRRSeleniumTest.base_url = (
-        "http://localhost:%s" % config_lib.CONFIG["AdminUI.port"])
+        f'http://localhost:{config_lib.CONFIG["AdminUI.port"]}')
 
     options = webdriver.ChromeOptions()
     test_lib.GRRSeleniumTest.driver = webdriver.Chrome(chrome_options=options)

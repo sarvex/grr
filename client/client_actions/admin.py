@@ -108,9 +108,7 @@ class BusyHang(actions.ActionPlugin):
   in_rdfvalue = rdfvalue.DataBlob
 
   def Run(self, arg):
-    duration = 5
-    if arg and arg.integer:
-      duration = arg.integer
+    duration = arg.integer if arg and arg.integer else 5
     end = time.time() + duration
     while time.time() < end:
       pass
@@ -124,11 +122,7 @@ class Bloat(actions.ActionPlugin):
 
     iterations = arg.integer or 1024  # Gives 1 gb.
 
-    l = []
-
-    for _ in range(iterations):
-      l.append("X" * 1048576)  # 1 mb.
-
+    l = ["X" * 1048576 for _ in range(iterations)]
     time.sleep(60)
 
 

@@ -139,23 +139,20 @@ class GlobalNotificationBar(renderers.TemplateRenderer):
     return super(GlobalNotificationBar, self).Layout(request, response)
 
   def RenderAjax(self, request, response):
-    # If notification_hash is part of request, remove notification with a
-    # given hash, otherwise just render list of notifications as usual.
-    if "notification_hash" in request.REQ:
-      hash_to_remove = int(request.REQ["notification_hash"])
-
-      user_record = aff4.FACTORY.Create(
-          aff4.ROOT_URN.Add("users").Add(request.user), "GRRUser",
-          mode="r", token=request.token)
-
-      notifications = user_record.GetPendingGlobalNotifications()
-      for notification in notifications:
-        if notification.hash == hash_to_remove:
-          flow.GRRFlow.StartFlow(flow_name="MarkGlobalNotificationAsShown",
-                                 args=notification, token=request.token)
-          break
-    else:
+    if "notification_hash" not in request.REQ:
       return self.Layout(request, response)
+    hash_to_remove = int(request.REQ["notification_hash"])
+
+    user_record = aff4.FACTORY.Create(
+        aff4.ROOT_URN.Add("users").Add(request.user), "GRRUser",
+        mode="r", token=request.token)
+
+    notifications = user_record.GetPendingGlobalNotifications()
+    for notification in notifications:
+      if notification.hash == hash_to_remove:
+        flow.GRRFlow.StartFlow(flow_name="MarkGlobalNotificationAsShown",
+                               args=notification, token=request.token)
+        break
 
 
 def FormatLastSeenTime(age):
@@ -167,7 +164,7 @@ def FormatLastSeenTime(age):
   time_last_seen = int(rdfvalue.RDFDatetime().Now() - age)
 
   if time_last_seen < 60:
-    return "%d seconds ago" % int(time_last_seen)
+    return "%d seconds ago" % time_last_seen
   elif time_last_seen < 60 * 60:
     return "%d minutes ago" % int(time_last_seen // 60)
   elif time_last_seen < 60 * 60 * 24:
@@ -185,14 +182,12 @@ def GetLowDiskWarnings(client):
     array of warning strings, empty if no warnings
   """
   warnings = []
-  volumes = client.Get(client.Schema.VOLUMES)
+  if volumes := client.Get(client.Schema.VOLUMES):
+    # Avoid showing warnings for the CDROM.  This is isn't a problem for linux and
+    # OS X since we only check usage on the disk mounted at "/".
+    exclude_windows_types = [
+        rdfvalue.WindowsVolume.WindowsDriveTypeEnum.DRIVE_CDROM]
 
-  # Avoid showing warnings for the CDROM.  This is isn't a problem for linux and
-  # OS X since we only check usage on the disk mounted at "/".
-  exclude_windows_types = [
-      rdfvalue.WindowsVolume.WindowsDriveTypeEnum.DRIVE_CDROM]
-
-  if volumes:
     for volume in volumes:
       if volume.windows.drive_type not in exclude_windows_types:
         freespace = volume.FreeSpacePercent()
@@ -233,26 +228,19 @@ Status: {{this.icon|safe}}
   def Layout(self, request, response):
     """Manage content pane depending on passed in query parameter."""
 
-    client_id = request.REQ.get("client_id")
-    if client_id:
+    if client_id := request.REQ.get("client_id"):
       client_id = rdfvalue.ClientURN(client_id)
       client = aff4.FACTORY.Open(client_id, token=request.token)
 
       self.last_crash = None
-      crash = client.Get(client.Schema.LAST_CRASH)
-      if crash:
+      if crash := client.Get(client.Schema.LAST_CRASH):
         time_since_crash = rdfvalue.RDFDatetime().Now() - crash.timestamp
         if time_since_crash < self.MAX_TIME_SINCE_CRASH:
           self.last_crash = FormatLastSeenTime(crash.timestamp)
 
       self.disk_full = GetLowDiskWarnings(client)
 
-      ping = client.Get(client.Schema.PING)
-      if ping:
-        age = ping
-      else:
-        age = 0
-
+      age = ping if (ping := client.Get(client.Schema.PING)) else 0
       # Also check for proper access.
       aff4.FACTORY.Open(client.urn.Add("fs"), token=request.token)
 
@@ -359,7 +347,7 @@ class Navigator(renderers.TemplateRenderer):
     """Manage content pane depending on passed in query parameter."""
     self.reason = request.REQ.get("reason", "")
     if "/" in self.reason and not self.reason.startswith("http"):
-      self.reason = "http://%s" % self.reason
+      self.reason = f"http://{self.reason}"
 
     self.host_advanced_headings = []
     self.host_headings = []
@@ -381,7 +369,7 @@ class Navigator(renderers.TemplateRenderer):
       for behaviour in self.general_headings:
         if behaviour in cls.behaviours:
           self.general_headings[behaviour][1].append((cls, cls.__name__))
-        if behaviour + "Advanced" in cls.behaviours:
+        if f"{behaviour}Advanced" in cls.behaviours:
           self.general_headings[behaviour][2].append((cls, cls.__name__))
 
       if "Host" in cls.behaviours:
@@ -496,8 +484,7 @@ class ClientStatusIconsRenderer(semantic.RDFValueRenderer):
     if (last_crash and
         (rdfvalue.RDFDatetime().Now() - last_crash.timestamp) <
         self.MAX_TIME_SINCE_CRASH):
-      self.crash_time = "%s (%s)" % (str(last_crash.timestamp),
-                                     FormatLastSeenTime(last_crash.timestamp))
+      self.crash_time = f"{str(last_crash.timestamp)} ({FormatLastSeenTime(last_crash.timestamp)})"
       self.show_crash_icon = True
 
     self.disk_full = ", ".join(GetLowDiskWarnings(self.proxy))
@@ -597,14 +584,13 @@ class ApplyLabelToClientsDialog(renderers.ConfirmationDialogRenderer):
 
   def Layout(self, request, response):
     self.client_urns = []
-    for client_urn_str in json.loads(request.REQ["selected_clients"]):
-      self.client_urns.append(rdfvalue.ClientURN(client_urn_str))
-
+    self.client_urns.extend(
+        rdfvalue.ClientURN(client_urn_str)
+        for client_urn_str in json.loads(request.REQ["selected_clients"]))
     labels_index = aff4.FACTORY.Create(
         aff4.VFSGRRClient.labels_index_urn, "AFF4LabelsIndex",
         mode="rw", token=request.token)
-    used_labels = sorted(
-        set([label.name for label in labels_index.ListUsedLabels()]))
+    used_labels = sorted({label.name for label in labels_index.ListUsedLabels()})
 
     response = super(ApplyLabelToClientsDialog, self).Layout(
         request, response)
@@ -612,10 +598,10 @@ class ApplyLabelToClientsDialog(renderers.ConfirmationDialogRenderer):
                                labels=used_labels)
 
   def RenderAjax(self, request, response):
-    client_urns = []
-    for client_urn_str in json.loads(request.REQ["selected_clients"]):
-      client_urns.append(rdfvalue.ClientURN(client_urn_str))
-
+    client_urns = [
+        rdfvalue.ClientURN(client_urn_str)
+        for client_urn_str in json.loads(request.REQ["selected_clients"])
+    ]
     self.label = request.REQ.get("input_apply_label_to_clients", "")
 
     flow.GRRFlow.StartFlow(
@@ -643,8 +629,7 @@ class ClientLabelsRenderer(semantic.RDFValueRenderer):
 """)
 
   def Layout(self, request, response):
-    labels_list = self.proxy.Get(self.proxy.Schema.LABELS)
-    if labels_list:
+    if labels_list := self.proxy.Get(self.proxy.Schema.LABELS):
       self.labels = labels_list.labels
     else:
       self.labels = []
@@ -709,7 +694,7 @@ class HostTable(renderers.TableRenderer):
       self.message = "A query string must be provided."
       return False
 
-    logging.info("Processing Client Query [%s]" % query_string)
+    logging.info(f"Processing Client Query [{query_string}]")
 
     try:
       # If the string begins with the token k, we treat the remaining tokens as
@@ -732,7 +717,7 @@ class HostTable(renderers.TableRenderer):
                                            token=request.token)
       result_set = aff4.FACTORY.MultiOpen(result_urns, token=request.token)
 
-      self.message = "Searched for %s" % query_string
+      self.message = f"Searched for {query_string}"
 
       for child in result_set:
         # Add the fd to all the columns
@@ -794,8 +779,9 @@ class SearchHostView(renderers.Renderer):
     labels_index = aff4.FACTORY.Create(
         aff4.VFSGRRClient.labels_index_urn, "AFF4LabelsIndex",
         mode="rw", token=request.token)
-    used_labels = sorted(list(
-        set([label.name for label in labels_index.ListUsedLabels()])))
+    used_labels = sorted(
+        list({label.name
+              for label in labels_index.ListUsedLabels()}))
 
     return self.CallJavascript(response, "SearchHostView.Layout",
                                labels=used_labels)

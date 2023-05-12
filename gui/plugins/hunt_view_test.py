@@ -430,7 +430,7 @@ class TestHuntView(test_lib.GRRSeleniumTest):
     self.WaitUntil(self.IsTextPresent, "COMPLETED")
 
     # Select the first client which should have errors.
-    self.Click("css=td:contains('%s')" % self.client_ids[1].Basename())
+    self.Click(f"css=td:contains('{self.client_ids[1].Basename()}')")
     self.WaitUntil(self.IsTextPresent, "Last Checkin")
 
     self.Click("css=a[renderer=HuntLogRenderer]")

@@ -100,8 +100,10 @@ class TestMultiGetFile(base.AutomatedTest):
     runner = flow_obj.GetRunner()
     self.assertFalse(runner.context.get("backtrace", ""))
     self.assertEqual(
-        runner.GetState(), rdfvalue.Flow.State.TERMINATED,
-        "Expected TERMINATED state, got %s" % flow_obj.state.context.state)
+        runner.GetState(),
+        rdfvalue.Flow.State.TERMINATED,
+        f"Expected TERMINATED state, got {flow_obj.state.context.state}",
+    )
 
 
 #########
@@ -125,7 +127,7 @@ class TestGetFileTSKLinux(base.AutomatedTest):
     if pos > 0:
       prefix = self.client_id.Add(self.test_output_path[:pos])
       for urn in base.RecursiveListChildren(prefix=prefix):
-        if re.search(self.test_output_path + "$", str(urn)):
+        if re.search(f"{self.test_output_path}$", str(urn)):
           self.delete_urns.add(urn)
           return self.CheckFile(aff4.FACTORY.Open(urn, token=self.token))
 
@@ -137,7 +139,7 @@ class TestGetFileTSKLinux(base.AutomatedTest):
       fd = aff4.FACTORY.Open(urn, token=self.token)
       if isinstance(fd, aff4.BlobImage):
         return self.CheckFile(fd)
-      self.fail("Output file %s not found." % urn)
+      self.fail(f"Output file {urn} not found.")
 
   def CheckFile(self, fd):
     data = fd.Read(10)
@@ -183,6 +185,9 @@ class TestSendFile(base.LocalClientTest):
 
   def setUp(self):
 
+
+
+
     class Listener(threading.Thread):
       result = []
       daemon = True
@@ -207,10 +212,12 @@ class TestSendFile(base.LocalClientTest):
           break
         conn, _ = s.accept()
         while 1:
-          data = conn.recv(1024)
-          if not data: break
-          self.result.append(data)
+          if data := conn.recv(1024):
+            self.result.append(data)
+          else:
+            break
         conn.close()
+
 
     self.listener = Listener()
     self.listener.start()
@@ -247,8 +254,7 @@ class TestMultiGetFileTSKMac(TestGetFileTSKLinux):
         self.client_id.Add("fs/tsk/dev")).OpenChildren()
 
     for d in tsk_dirs:
-      pathspec = d.Get(d.Schema.PATHSPEC)
-      if pathspec:
+      if pathspec := d.Get(d.Schema.PATHSPEC):
         pathspec.nested_path = rdfvalue.PathSpec(
             path="/bin/ls",
             pathtype=rdfvalue.PathSpec.PathType.TSK)

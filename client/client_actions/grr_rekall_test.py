@@ -254,4 +254,4 @@ class RekallTests(RekallTestSuite):
         failed_plugins.append(plugin)
         logging.error("Plugin %s failed.", plugin)
     if failed_plugins:
-      self.fail("Some plugins failed: %s" % failed_plugins)
+      self.fail(f"Some plugins failed: {failed_plugins}")

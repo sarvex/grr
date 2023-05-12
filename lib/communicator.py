@@ -303,24 +303,25 @@ class ReceivedCipher(Cipher):
 
   def VerifyCipherSignature(self):
     """Verify the signature on the encrypted cipher block."""
-    if self.cipher_metadata.signature:
-      digest = self.hash_function(self.serialized_cipher).digest()
-      try:
-        remote_public_key = self.pub_key_cache.GetRSAPublicKey(
-            self.cipher_metadata.source)
+    if not self.cipher_metadata.signature:
+      return
+    digest = self.hash_function(self.serialized_cipher).digest()
+    try:
+      remote_public_key = self.pub_key_cache.GetRSAPublicKey(
+          self.cipher_metadata.source)
 
-        stats.STATS.IncrementCounter("grr_rsa_operations")
-        if remote_public_key.verify(digest, self.cipher_metadata.signature,
-                                    self.hash_function_name) == 1:
-          self.signature_verified = True
-        else:
-          raise DecryptionError("Signature not verified by remote public key.")
+      stats.STATS.IncrementCounter("grr_rsa_operations")
+      if remote_public_key.verify(digest, self.cipher_metadata.signature,
+                                  self.hash_function_name) == 1:
+        self.signature_verified = True
+      else:
+        raise DecryptionError("Signature not verified by remote public key.")
 
-      except (X509.X509Error, RSA.RSAError) as e:
-        raise DecryptionError(e)
+    except (X509.X509Error, RSA.RSAError) as e:
+      raise DecryptionError(e)
 
-      except UnknownClientCert:
-        pass
+    except UnknownClientCert:
+      pass
 
 
 class Communicator(object):
@@ -399,8 +400,7 @@ class Communicator(object):
        RuntimeError: If we do not support this api version.
     """
     if api_version not in [3]:
-      raise RuntimeError("Unsupported api version: %s, expected 3." %
-                         api_version)
+      raise RuntimeError(f"Unsupported api version: {api_version}, expected 3.")
 
     if destination is None:
       destination = self.server_name
@@ -469,7 +469,7 @@ class Communicator(object):
       return self.DecodeMessages(response_comms)
     except (rdfvalue.DecodeError, type_info.TypeValueError,
             ValueError, AttributeError) as e:
-      raise DecodingError("Protobuf parsing error: %s" % e)
+      raise DecodingError(f"Protobuf parsing error: {e}")
 
   def DecompressMessageList(self, signed_message_list):
     """Decompress the message data from signed_message_list.
@@ -491,7 +491,7 @@ class Communicator(object):
       try:
         data = zlib.decompress(signed_message_list.message_list)
       except zlib.error as e:
-        raise DecodingError("Failed to decompress: %s" % e)
+        raise DecodingError(f"Failed to decompress: {e}")
     else:
       raise DecodingError("Compression scheme not supported")
 
@@ -515,41 +515,40 @@ class Communicator(object):
        DecryptionError: If the message failed to decrypt properly.
     """
     if response_comms.api_version not in [3]:
-      raise DecryptionError("Unsupported api version: %s, expected 3." %
-                            response_comms.api_version)
+      raise DecryptionError(
+          f"Unsupported api version: {response_comms.api_version}, expected 3.")
 
-    if response_comms.encrypted_cipher:
-      # Have we seen this cipher before?
-      try:
-        cipher = self.encrypted_cipher_cache.Get(
-            response_comms.encrypted_cipher)
-      except KeyError:
-        cipher = ReceivedCipher(response_comms, self.private_key,
-                                self.pub_key_cache)
-
-        if cipher.signature_verified:
-          # Remember it for next time.
-          self.encrypted_cipher_cache.Put(response_comms.encrypted_cipher,
-                                          cipher)
-
-      # Verify the cipher HMAC with the new response_comms. This will raise
-      # DecryptionError if the HMAC does not agree.
-      cipher.VerifyHMAC(response_comms)
-
-      # Decrypt the message with the per packet IV.
-      plain = cipher.Decrypt(
-          response_comms.encrypted, response_comms.packet_iv)
-      try:
-        signed_message_list = rdfvalue.SignedMessageList(plain)
-      except rdfvalue.DecodeError as e:
-        raise DecryptionError(str(e))
-
-      message_list = self.DecompressMessageList(signed_message_list)
-
-    else:
+    if not response_comms.encrypted_cipher:
       # The message is not encrypted. We do not allow unencrypted
       # messages:
       raise DecryptionError("Server response is not encrypted.")
+
+    # Have we seen this cipher before?
+    try:
+      cipher = self.encrypted_cipher_cache.Get(
+          response_comms.encrypted_cipher)
+    except KeyError:
+      cipher = ReceivedCipher(response_comms, self.private_key,
+                              self.pub_key_cache)
+
+      if cipher.signature_verified:
+        # Remember it for next time.
+        self.encrypted_cipher_cache.Put(response_comms.encrypted_cipher,
+                                        cipher)
+
+    # Verify the cipher HMAC with the new response_comms. This will raise
+    # DecryptionError if the HMAC does not agree.
+    cipher.VerifyHMAC(response_comms)
+
+    # Decrypt the message with the per packet IV.
+    plain = cipher.Decrypt(
+        response_comms.encrypted, response_comms.packet_iv)
+    try:
+      signed_message_list = rdfvalue.SignedMessageList(plain)
+    except rdfvalue.DecodeError as e:
+      raise DecryptionError(str(e))
+
+    message_list = self.DecompressMessageList(signed_message_list)
 
     # Are these messages authenticated?
     auth_state = self.VerifyMessageSignature(

@@ -124,11 +124,7 @@ class StatsStoreMetricsMetadata(rdfvalue.RDFProtoStruct):
   protobuf = jobs_pb2.StatsStoreMetricsMetadata
 
   def AsDict(self):
-    result = {}
-    for metric in self.metrics:
-      result[metric.varname] = metric
-
-    return result
+    return {metric.varname: metric for metric in self.metrics}
 
 
 class StatsStoreProcessData(aff4.AFF4Object):
@@ -202,10 +198,10 @@ class StatsStoreProcessData(aff4.AFF4Object):
     if timestamp == self.NEWEST_TIMESTAMP:
       raise ValueError("Can't use NEWEST_TIMESTAMP in DeleteStats.")
 
-    predicates = []
-    for key in stats.STATS.GetAllMetricsMetadata().keys():
-      predicates.append(self.STATS_STORE_PREFIX + key)
-
+    predicates = [
+        self.STATS_STORE_PREFIX + key
+        for key in stats.STATS.GetAllMetricsMetadata().keys()
+    ]
     start = None
     end = None
     if timestamp and timestamp != self.ALL_TIMESTAMPS:
@@ -273,11 +269,11 @@ class StatsStore(aff4.AFF4Volume):
     subjects_data = aff4.FACTORY.MultiOpen(subjects, mode="r", token=self.token,
                                            aff4_type="StatsStoreProcessData")
 
-    results = {}
-    for subject_data in subjects_data:
-      results[subject_data.urn.Basename()] = subject_data.Get(
-          subject_data.Schema.METRICS_METADATA).AsDict()
-
+    results = {
+        subject_data.urn.Basename():
+        subject_data.Get(subject_data.Schema.METRICS_METADATA).AsDict()
+        for subject_data in subjects_data
+    }
     for process_id in process_ids:
       results.setdefault(process_id, {})
 
@@ -329,11 +325,11 @@ class StatsStore(aff4.AFF4Volume):
 
         stored_value = rdfvalue.StatsStoreValue(value_string)
 
-        fields_values = []
         if metadata.fields_defs:
-          for stored_field_value in stored_value.fields_values:
-            fields_values.append(stored_field_value.value)
-
+          fields_values = [
+              stored_field_value.value
+              for stored_field_value in stored_value.fields_values
+          ]
           current_dict = part_results.setdefault(metric_name, {})
           for field_value in fields_values[:-1]:
             new_dict = {}
@@ -403,13 +399,11 @@ class StatsStoreDataQuery(object):
         try:
           values.append(getattr(value, attr))
         except AttributeError:
-          raise ValueError("Can't find attribute %s in value %s." % (
-              attr, value))
-      else:
-        if hasattr(value, "sum") or hasattr(value, "count"):
-          raise ValueError(
-              "Can't treat complext type as simple value: %s" % value)
+          raise ValueError(f"Can't find attribute {attr} in value {value}.")
+      elif hasattr(value, "sum") or hasattr(value, "count"):
+        raise ValueError(f"Can't treat complext type as simple value: {value}")
 
+      else:
         values.append(value)
 
       timestamps.append(pandas.Timestamp(timestamp * 1e3))
@@ -440,7 +434,7 @@ class StatsStoreDataQuery(object):
     for current_dict in self.current_dicts:
       for key, value in current_dict.iteritems():
         m = re.match(regex, key)
-        if m and m.string == m.group(0):
+        if m and m.string == m[0]:
           new_current_dicts.append(value)
 
     self.current_dicts = new_current_dicts
@@ -461,9 +455,7 @@ class StatsStoreDataQuery(object):
     """
     new_dicts = []
     for current_dict in dicts:
-      for _, value in current_dict.iteritems():
-        new_dicts.append(value)
-
+      new_dicts.extend(value for _, value in current_dict.iteritems())
     sub_dicts = [x for x in new_dicts
                  if hasattr(x, "iteritems")]
     if not sub_dicts:
@@ -490,7 +482,7 @@ class StatsStoreDataQuery(object):
     if self.time_series is None:
       raise RuntimeError("EnsureIsIncremental must be called after Take*().")
 
-    state = dict()
+    state = {}
     def FixIncremention(value):
       if state["prev_value"] is None:
         state["prev_value"] = value
@@ -515,11 +507,10 @@ class StatsStoreDataQuery(object):
     if self.time_series is None:
       raise RuntimeError("Resample must be called after Take*().")
 
-    new_time_series = []
-    for time_serie in self.time_series:
-      new_time_series.append(
-          time_serie.resample("%ds" % interval.seconds, how="mean"))
-
+    new_time_series = [
+        time_serie.resample("%ds" % interval.seconds, how="mean")
+        for time_serie in self.time_series
+    ]
     self.time_series = new_time_series
     self.sample_interval = interval
     return self
@@ -576,10 +567,9 @@ class StatsStoreDataQuery(object):
     range_end = pandas.to_datetime(
         range_end.AsMicroSecondsFromEpoch() * 1e3)
 
-    new_time_series = []
-    for time_serie in self.time_series:
-      new_time_series.append(time_serie[range_start:range_end])
-
+    new_time_series = [
+        time_serie[range_start:range_end] for time_serie in self.time_series
+    ]
     self.time_series = new_time_series
     return self
 
@@ -589,9 +579,9 @@ class StatsStoreDataQuery(object):
     self.query_type = self.VALUE_QUERY
 
     self.time_series = []
-    for current_dict in self.current_dicts:
-      self.time_series.append(self._TimeSeriesFromData(current_dict))
-
+    self.time_series.extend(
+        self._TimeSeriesFromData(current_dict)
+        for current_dict in self.current_dicts)
     return self
 
   def TakeDistributionSum(self):
@@ -600,9 +590,9 @@ class StatsStoreDataQuery(object):
     self.query_type = self.DISTRIBUTION_SUM_QUERY
 
     self.time_series = []
-    for current_dict in self.current_dicts:
-      self.time_series.append(self._TimeSeriesFromData(current_dict, "sum"))
-
+    self.time_series.extend(
+        self._TimeSeriesFromData(current_dict, "sum")
+        for current_dict in self.current_dicts)
     return self
 
   def TakeDistributionCount(self):
@@ -611,9 +601,9 @@ class StatsStoreDataQuery(object):
     self.query_type = self.DISTRIBUTION_COUNT_QUERY
 
     self.time_series = []
-    for current_dict in self.current_dicts:
-      self.time_series.append(self._TimeSeriesFromData(current_dict, "count"))
-
+    self.time_series.extend(
+        self._TimeSeriesFromData(current_dict, "count")
+        for current_dict in self.current_dicts)
     return self
 
   def AggregateViaSum(self):
@@ -652,10 +642,7 @@ class StatsStoreDataQuery(object):
     """Return number of time series the query was narrowed to."""
 
     if not self.time_series:
-      if not self.current_dicts:
-        return 0
-      else:
-        return len(self.current_dicts)
+      return 0 if not self.current_dicts else len(self.current_dicts)
     else:
       return len(self.time_series)
 
@@ -693,10 +680,10 @@ class StatsStoreDataQuery(object):
     if self.time_series is None:
       raise RuntimeError("Scale must be called after Take*().")
 
-    new_time_series = []
-    for time_serie in self.time_series:
-      new_time_series.append(time_serie.apply(lambda x: x * multiplier))
-
+    new_time_series = [
+        time_serie.apply(lambda x: x * multiplier)
+        for time_serie in self.time_series
+    ]
     self.time_series = new_time_series
     return self
 

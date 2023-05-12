@@ -73,7 +73,7 @@ class VFSHandler(object):
     elif whence == 2:
       self.offset = self.size + offset
     else:
-      raise RuntimeError("Illegal whence value %s" % whence)
+      raise RuntimeError(f"Illegal whence value {whence}")
 
   def Read(self, length):
     """Reads some data from the file."""
@@ -132,10 +132,7 @@ class VFSHandler(object):
           component = x
           break
 
-    new_pathspec = rdfvalue.PathSpec(path=component,
-                                     pathtype=fd.supported_pathtype)
-
-    return new_pathspec
+    return rdfvalue.PathSpec(path=component, pathtype=fd.supported_pathtype)
 
   def ListFiles(self):
     """An iterator over all VFS files contained in this directory.
@@ -323,7 +320,7 @@ def VFSOpen(pathspec, progress_callback=None):
       fd = handler.Open(fd, component, pathspec=pathspec,
                         progress_callback=progress_callback)
     except IOError as e:
-      raise IOError("%s: %s" % (e, component))
+      raise IOError(f"{e}: {component}")
 
   return fd
 

@@ -103,19 +103,18 @@ No actions currently in progress.
     leased_tasks = []
     with queue_manager.QueueManager(token=request.token) as manager:
       tasks = manager.Query(self.client_id.Queue(), limit=1000)
-      for task in tasks:
-        if task.eta > current_time:
-          leased_tasks.append(task)
-
-    flows_map = {}
-    for flow_obj in aff4.FACTORY.MultiOpen(
-        set(task.session_id for task in leased_tasks),
-        mode="r", token=request.token):
-      flows_map[flow_obj.urn] = flow_obj
-
+      leased_tasks.extend(task for task in tasks if task.eta > current_time)
+    flows_map = {
+        flow_obj.urn: flow_obj
+        for flow_obj in aff4.FACTORY.MultiOpen(
+            {task.session_id
+             for task in leased_tasks},
+            mode="r",
+            token=request.token,
+        )
+    }
     for task in leased_tasks:
-      flow_obj = flows_map.get(task.session_id, None)
-      if flow_obj:
+      if flow_obj := flows_map.get(task.session_id, None):
         self.client_actions.append(dict(
             name=task.name,
             priority=str(task.priority),
@@ -243,9 +242,14 @@ class RequestTable(renderers.TableRenderer):
         self.AddCell(i, "Status", dict(
             icon="stock_yes", description="Available for Lease"))
       else:
-        self.AddCell(i, "Status", dict(
-            icon="clock",
-            description="Leased for %s Seconds" % (difference / 1e6)))
+        self.AddCell(
+            i,
+            "Status",
+            dict(
+                icon="clock",
+                description=f"Leased for {difference / 1000000.0} Seconds",
+            ),
+        )
 
       self.AddCell(i, "ID", task.task_id)
       self.AddCell(i, "Flow", task.session_id)
@@ -277,7 +281,7 @@ class ResponsesTable(renderers.TableRenderer):
     """Builds the table."""
     client_id = rdfvalue.ClientURN(request.REQ.get("client_id"))
 
-    task_id = "task:%s" % request.REQ.get("task_id", "")
+    task_id = f'task:{request.REQ.get("task_id", "")}'
 
     # Make a local QueueManager.
     manager = queue_manager.QueueManager(token=request.token)
@@ -376,8 +380,7 @@ class RequestRenderer(renderers.TemplateRenderer):
 
     # Make a local QueueManager.
     manager = queue_manager.QueueManager(token=request.token)
-    msgs = manager.Query(client_id, task_id=task_id)
-    if msgs:
+    if msgs := manager.Query(client_id, task_id=task_id):
       self.msg = msgs[0]
       self.view = semantic.FindRendererForObject(
           self.msg).RawHTML(request)

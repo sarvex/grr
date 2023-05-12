@@ -93,10 +93,10 @@ class UserActivity(StackChart):
           self.weekly_activity[-week][1] += 1
 
       self.data = []
-      for user, data in self.user_activity.items():
-        if user not in aff4.GRRUser.SYSTEM_USERS:
-          self.data.append(dict(label=user, data=data))
-
+      self.data.extend(
+          dict(label=user, data=data)
+          for user, data in self.user_activity.items()
+          if user not in aff4.GRRUser.SYSTEM_USERS)
       self.data = renderers.JsonDumpForScriptContext(self.data)
 
     except IOError:
@@ -156,9 +156,10 @@ class SystemFlows(statistics.Report, renderers.TableRenderer):
         total_count = countdict["total"]
         countdict.pop("total")
         topusercounts = sorted(countdict.iteritems(),
-                               key=operator.itemgetter(1), reverse=True)[0:3]
-        topusers = ", ".join("%s (%s)" % (user, count) for user, count in
-                             topusercounts)
+                               key=operator.itemgetter(1),
+                               reverse=True)[:3]
+        topusers = ", ".join(f"{user} ({count})"
+                             for user, count in topusercounts)
         self.AddRow({"Flow Name": flow, "Run Count": total_count,
                      "Most Run By": topusers})
     except IOError:
@@ -223,10 +224,9 @@ class ClientActivity(StackChart):
           self.weekly_activity[-week][1] += 1
 
       self.data = []
-      for client, data in self.client_activity.items():
-        if client:
-          self.data.append(dict(label=str(client), data=data))
-
+      self.data.extend(
+          dict(label=str(client), data=data)
+          for client, data in self.client_activity.items() if client)
       self.data = renderers.JsonDumpForScriptContext(self.data)
 
     except IOError:
@@ -266,9 +266,10 @@ class AuditTable(statistics.Report, renderers.TableRenderer):
       for event in fd.GenerateItems(timestamp=(start.AsMicroSecondsFromEpoch(),
                                                now.AsMicroSecondsFromEpoch())):
         if event.action in self.TYPES:
-          row_dict = {}
-          for column_name, attribute in self.column_map.iteritems():
-            row_dict[column_name] = event.Get(attribute)
+          row_dict = {
+              column_name: event.Get(attribute)
+              for column_name, attribute in self.column_map.iteritems()
+          }
           rows.append(row_dict)
 
       for row in sorted(rows, key=lambda x: x["Timestamp"]):

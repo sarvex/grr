@@ -39,11 +39,7 @@ class BufferReferenceRenderer(semantic.RDFProtoRenderer):
       for _ in range(16):
         ord_value = ord(data[idx])
         result += "%02X " % ord_value
-        if ord_value > 32 and ord_value < 127:
-          raw += cgi.escape(data[idx])
-        else:
-          raw += "."
-
+        raw += cgi.escape(data[idx]) if ord_value > 32 and ord_value < 127 else "."
         idx += 1
 
         if idx >= len(data):
@@ -201,10 +197,7 @@ class GrepResultRenderer(semantic.RDFProtoRenderer):
 """)
 
   def Layout(self, request, response):
-    self.results = []
-    for row in self.proxy:
-      self.results.append([row.offset, repr(row)])
-
+    self.results = [[row.offset, repr(row)] for row in self.proxy]
     return renderers.TemplateRenderer.Layout(self, request, response)
 
 
@@ -318,11 +311,7 @@ class ConnectionsRenderer(semantic.RDFValueArrayRenderer):
         remote_address = "%s:%d" % (conn.remote_address.ip,
                                     conn.remote_address.port)
       else:
-        if ":" in conn.local_address.ip:
-          remote_address = ":::*"
-        else:
-          remote_address = "0.0.0.0:*"
-
+        remote_address = ":::*" if ":" in conn.local_address.ip else "0.0.0.0:*"
       result.append(self.FormatFromTemplate(self.connection_template,
                                             type=conn_type,
                                             local_address=local_address,
@@ -404,8 +393,10 @@ class BlobArrayRenderer(semantic.RDFValueRenderer):
           array.append(getattr(i, field))
           break
 
-    return self.RenderFromTemplate(self.layout_template, response,
-                                   first=array[0:1], array=array[1:])
+    return self.RenderFromTemplate(self.layout_template,
+                                   response,
+                                   first=array[:1],
+                                   array=array[1:])
 
 
 class AgeSelector(semantic.RDFValueRenderer):
@@ -497,20 +488,20 @@ class AbstractFileTable(renderers.TableRenderer):
     if filter_term:
       column, regex = filter_term.split(":", 1)
 
-      escaped_regex = utils.EscapeRegex(aff4_path + "/")
+      escaped_regex = utils.EscapeRegex(f"{aff4_path}/")
       # The start anchor refers only to this directory.
       if regex.startswith("^"):
         escaped_regex += utils.EscapeRegex(regex[1:])
       else:
-        escaped_regex += ".*" + utils.EscapeRegex(regex)
+        escaped_regex += f".*{utils.EscapeRegex(regex)}"
 
-      filter_string = "subject matches '%s'" % escaped_regex
+      filter_string = f"subject matches '{escaped_regex}'"
 
     # For now we just list the directory
     try:
       key = utils.SmartUnicode(urn)
       if filter_string:
-        key += ":" + filter_string
+        key += f":{filter_string}"
 
       # Open the directory as a directory.
       directory_node = aff4.FACTORY.Open(urn, token=request.token).Upgrade(
@@ -519,7 +510,7 @@ class AbstractFileTable(renderers.TableRenderer):
         raise IOError()
 
       key += str(directory_node.Get(directory_node.Schema.LAST))
-      key += ":" + str(request.token)
+      key += f":{str(request.token)}"
       try:
         children = self.content_cache.Get(key)
       except KeyError:
@@ -535,8 +526,7 @@ class AbstractFileTable(renderers.TableRenderer):
         self.content_cache.Put(key, children)
 
         try:
-          self.message = "Directory Listing '%s' was taken on %s" % (
-              aff4_path, directory_node.Get(directory_node.Schema.TYPE.age))
+          self.message = f"Directory Listing '{aff4_path}' was taken on {directory_node.Get(directory_node.Schema.TYPE.age)}"
         except AttributeError:
           pass
 
@@ -549,11 +539,8 @@ class AbstractFileTable(renderers.TableRenderer):
     # Make sure the table knows how large it is for paging.
     self.size = len(children)
     self.columns[1].base_path = urn
-    for fd in children[start_row:end_row]:
-      # We use the timestamp on the TYPE as a proxy for the last update time
-      # of this object - its only an estimate.
-      fd_type = fd.Get(fd.Schema.TYPE)
-      if fd_type:
+    for fd in children[row_index:end_row]:
+      if fd_type := fd.Get(fd.Schema.TYPE):
         self.AddCell(row_index, "Age", rdfvalue.RDFDatetime(fd_type.age))
 
       self.AddCell(row_index, "Name", fd.urn)
@@ -662,8 +649,7 @@ class FileSystemTree(renderers.TreeRenderer):
                   if "Container" in ch.behaviours]
 
       try:
-        self.message = "Directory %s Last retrieved %s" % (
-            urn, directory.Get(directory.Schema.TYPE).age)
+        self.message = f"Directory {urn} Last retrieved {directory.Get(directory.Schema.TYPE).age}"
       except AttributeError:
         pass
 
@@ -671,7 +657,7 @@ class FileSystemTree(renderers.TreeRenderer):
         self.AddElement(child.urn.RelativeName(urn))
 
     except IOError as e:
-      self.message = "Error fetching %s: %s" % (urn, e)
+      self.message = f"Error fetching {urn}: {e}"
 
 
 class RecursiveRefreshDialog(renderers.ConfirmationDialogRenderer):
@@ -843,7 +829,7 @@ class UpdateAttribute(renderers.TemplateRenderer):
           update_flow_urn, aff4_type="UpdateVFSFile", token=request.token)
       self.flow_urn = str(update_flow.state.get_file_flow_urn)
     except IOError as e:
-      raise IOError("Sorry. This path cannot be refreshed due to %s" % e)
+      raise IOError(f"Sorry. This path cannot be refreshed due to {e}")
 
     if self.flow_urn:
       response = super(UpdateAttribute, self).Layout(request, response)
@@ -1031,7 +1017,7 @@ As downloaded on {{ this.age|escape }}.<br>
       response = http.HttpResponse(content=Generator(),
                                    content_type="binary/octet-stream")
       # This must be a string.
-      response["Content-Disposition"] = ("attachment; filename=%s" % filename)
+      response["Content-Disposition"] = f"attachment; filename={filename}"
 
       return response
 
@@ -1202,7 +1188,7 @@ class AFF4Stats(renderers.TemplateRenderer):
       self.classes = self.RenderAFF4Attributes(self.fd, request)
       self.state["path"] = self.path = utils.SmartStr(self.fd.urn)
     except IOError:
-      self.path = "Unable to open %s" % self.urn
+      self.path = f"Unable to open {self.urn}"
       self.classes = []
 
     response = super(AFF4Stats, self).Layout(request, response)
@@ -1229,14 +1215,13 @@ class AFF4Stats(renderers.TemplateRenderer):
         # If we already showed this attribute we move on
         if attribute.predicate in attribute_names: continue
 
-        values = list(fd.GetValuesForAttribute(attribute))
-        multi = len(values) > 1
-
-        if values:
+        if values := list(fd.GetValuesForAttribute(attribute)):
           attribute_names.add(attribute.predicate)
           value_renderer = semantic.FindRendererForObject(values[0])
           if self.attributes_to_show and name not in self.attributes_to_show:
             continue
+
+          multi = len(values) > 1
 
           attributes.append((name, attribute.description,
 
@@ -1300,8 +1285,7 @@ class AFF4ObjectRenderer(renderers.TemplateRenderer):
       raise RuntimeError("No valid aff4 path or client id provided")
 
     fd = aff4.FACTORY.Open(aff4_path, token=request.token)
-    fd_type = fd.Get(fd.Schema.TYPE)
-    if fd_type:
+    if fd_type := fd.Get(fd.Schema.TYPE):
       for cls in self.classes.values():
         if getattr(cls, "aff4_type", None) == fd_type:
           subrenderer = cls
@@ -1370,9 +1354,8 @@ class FileViewTabs(renderers.TabLayout):
           self.delegated_renderers = self.delegated_renderers[:]
           self.delegated_renderers[1] = "RekallResponseCollectionRenderer"
 
-      else:
-        if not hasattr(self.fd, "Read"):
-          self.DisableTabs()
+      elif not hasattr(self.fd, "Read"):
+        self.DisableTabs()
 
     except IOError:
       self.DisableTabs()

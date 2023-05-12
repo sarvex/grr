@@ -512,8 +512,7 @@ class MultiShardedQueueManagerTest(QueueManagerTest):
     # There should be two notifications in two different shards.
     shards_with_data = 0
     for _ in range(manager.num_notification_shards):
-      shard_sessions = manager.GetNotifications(queues.HUNTS)
-      if shard_sessions:
+      if shard_sessions := manager.GetNotifications(queues.HUNTS):
         shards_with_data += 1
         self.assertEqual(len(shard_sessions), 1)
     self.assertEqual(shards_with_data, 2)

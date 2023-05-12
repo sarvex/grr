@@ -28,13 +28,14 @@ class ApiStatsStoreMetricsMetadataRenderer(api_call_renderers.ApiCallRenderer):
     stats_store = aff4.FACTORY.Create(None, aff4_type="StatsStore",
                                       mode="w", token=token)
 
-    process_ids = [pid for pid in stats_store.ListUsedProcessIds()
-                   if pid.startswith(args.component.name.lower())]
-    if not process_ids:
-      return {}
-    else:
+    if process_ids := [
+        pid for pid in stats_store.ListUsedProcessIds()
+        if pid.startswith(args.component.name.lower())
+    ]:
       metadata = stats_store.ReadMetadata(process_id=process_ids[0])
       return api_value_renderers.RenderValue(metadata)
+    else:
+      return {}
 
 
 class ApiStatsStoreMetricRendererArgs(rdfvalue.RDFProtoStruct):
@@ -86,7 +87,7 @@ class ApiStatsStoreMetricRenderer(api_call_renderers.ApiCallRenderer):
     metric_metadata = metadata[args.metric_name]
 
     query = stats_store_lib.StatsStoreDataQuery(data)
-    query.In(args.component.name.lower() + ".*").In(args.metric_name)
+    query.In(f"{args.component.name.lower()}.*").In(args.metric_name)
     if metric_metadata.fields_defs:
       query.InAll()
 
@@ -107,8 +108,9 @@ class ApiStatsStoreMetricRenderer(api_call_renderers.ApiCallRenderer):
       elif args.distribution_handling_mode == "DH_COUNT":
         query.TakeDistributionCount()
       else:
-        raise ValueError("Unexpected request.distribution_handling_mode "
-                         "value: %s." % args.distribution_handling_mode)
+        raise ValueError(
+            f"Unexpected request.distribution_handling_mode value: {args.distribution_handling_mode}."
+        )
 
       query.EnsureIsIncremental().Resample(sampling_duration)
       query.FillMissing(rdfvalue.Duration("10m"))
@@ -122,20 +124,15 @@ class ApiStatsStoreMetricRenderer(api_call_renderers.ApiCallRenderer):
       query.AggregateViaSum()
     elif args.aggregation_mode == "AGG_MEAN":
       query.AggregateViaMean()
-    elif args.aggregation_mode == "AGG_NONE":
-      pass
-    else:
-      raise ValueError("Unexpected request.aggregation value: %s." %
-                       args.aggregation)
+    elif args.aggregation_mode != "AGG_NONE":
+      raise ValueError(f"Unexpected request.aggregation value: {args.aggregation}.")
 
     if (args.rate and
         metric_metadata.metric_type != metric_metadata.MetricType.GAUGE):
       query.Rate(args.rate)
 
-    timeseries = []
-    for timestamp, value in query.ts.iteritems():
-      timeseries.append((timestamp.value / 1e6, value))
-
+    timeseries = [(timestamp.value / 1e6, value)
+                  for timestamp, value in query.ts.iteritems()]
     result["timeseries"] = timeseries
     return result
 

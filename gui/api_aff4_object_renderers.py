@@ -73,12 +73,12 @@ class ApiAFF4ObjectRenderer(ApiAFF4ObjectRendererBase):
                   age_policy=aff4_object.age_policy)
 
     if args.type_info == args.TypeInformation.WITH_TYPES_AND_METADATA:
-      descriptors = {}
-      for attribute, _ in aff4_object.synced_attributes.items():
-        descriptors[attribute.predicate] = {
-            "description": attribute.description
-        }
-
+      descriptors = {
+          attribute.predicate: {
+              "description": attribute.description
+          }
+          for attribute, _ in aff4_object.synced_attributes.items()
+      }
       result["metadata"] = descriptors
 
     return result
@@ -120,12 +120,11 @@ class ApiRDFValueCollectionRenderer(ApiAFF4ObjectRendererBase):
       render_value_args["with_types"] = True
       render_value_args["with_metadata"] = True
 
-    result = {}
-    result["offset"] = args.offset
-    result["count"] = len(items)
-    result["items"] = api_value_renderers.RenderValue(
-        items, **render_value_args)
-
+    result = {
+        "offset": args.offset,
+        "count": len(items),
+        "items": api_value_renderers.RenderValue(items, **render_value_args),
+    }
     if args.with_total_count:
       if hasattr(aff4_object, "CalculateLength"):
         total_count = aff4_object.CalculateLength()
@@ -168,8 +167,7 @@ def RenderAFF4Object(obj, args):
         candidates.append(candidate)
 
     if not candidates:
-      raise RuntimeError("No renderer found for object %s." %
-                         obj.__class__.__name__)
+      raise RuntimeError(f"No renderer found for object {obj.__class__.__name__}.")
 
     # Ensure that the renderers order is stable.
     candidates = sorted(candidates, key=lambda cls: cls.__name__)

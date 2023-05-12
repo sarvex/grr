@@ -28,8 +28,8 @@ class TestDarwinPersistenceMechanisms(base.AutomatedTest):
     for p in persistence_list:
       if p.pathspec.path == launchservices:
         return
-    self.fail("Service listing does not contain launchservices: %s." %
-              launchservices)
+    self.fail(
+        f"Service listing does not contain launchservices: {launchservices}.")
 
 
 class TestRootDiskVolumeUsage(base.AutomatedTest):

@@ -33,10 +33,7 @@ def InterpolatePaths(path, labels):
   if "%%LABEL%%" not in path:
     return dict([(path, None)])
   else:
-    paths = {}
-    for label in labels:
-      paths[path.replace("%%LABEL%%", label)] = label
-    return paths
+    return {path.replace("%%LABEL%%", label): label for label in labels}
 
 
 def GetClassLookupDict(classes, labels):
@@ -50,8 +47,7 @@ def GetClassLookupDict(classes, labels):
   """
   paths = {}
   for cls in classes:
-    category = getattr(cls, "category", None)
-    if category:
+    if category := getattr(cls, "category", None):
       for path, label in InterpolatePaths(category, labels).items():
         paths[path] = (cls, label)
   return paths
@@ -162,9 +158,9 @@ class OSBreakdown(PieChart):
       self.data = []
       for graph in fd.Get(self.attribute):
         # Find the correct graph and merge the OS categories together
-        if "%s day" % self.active_day in graph.title:
-          for sample in graph:
-            self.data.append(dict(label=sample.label, data=sample.y_value))
+        if f"{self.active_day} day" in graph.title:
+          self.data.extend(
+              dict(label=sample.label, data=sample.y_value) for sample in graph)
           break
     except (IOError, TypeError):
       pass
@@ -236,7 +232,7 @@ evolves over time.
         # Provide the time in js timestamps (millisecond since the epoch)
         days = sample.x_value / 1000000 / 24 / 60 / 60
         if days in self.active_days_display:
-          label = "%s day active" % days
+          label = f"{days} day active"
           self.categories.setdefault(label, []).append(
               (graph_series.age / 1000, sample.y_value))
 
@@ -276,7 +272,7 @@ on the GRR version.
   def _ProcessGraphSeries(self, graph_series):
     for graph in graph_series:
       # Find the correct graph and merge the OS categories together
-      if "%s day" % self.active_day in graph.title:
+      if f"{self.active_day} day" in graph.title:
         for sample in graph:
           self.categories.setdefault(sample.label, []).append(
               (graph_series.age / 1000, sample.y_value))
@@ -387,7 +383,7 @@ class AFF4ClientStats(Report):
       return super(AFF4ClientStats, self).Layout(request, response)
 
     # CPU usage graph.
-    series = dict()
+    series = {}
     for stat_entry in stats:
       for s in stat_entry.cpu_samples:
         series[int(s.timestamp / 1e3)] = s.cpu_percent
@@ -397,7 +393,7 @@ class AFF4ClientStats(Report):
     self.graphs.append(graph)
 
     # IO graphs.
-    series = dict()
+    series = {}
     for stat_entry in stats:
       for s in stat_entry.io_samples:
         series[int(s.timestamp / 1e3)] = int(s.read_bytes / 1024 / 1024)
@@ -407,7 +403,7 @@ class AFF4ClientStats(Report):
     graph.AddSeries(series, "IO Bytes Read in MB", max_samples)
     self.graphs.append(graph)
 
-    series = dict()
+    series = {}
     for stat_entry in stats:
       for s in stat_entry.io_samples:
         series[int(s.timestamp / 1e3)] = int(s.write_bytes / 1024 / 1024)
@@ -421,13 +417,15 @@ class AFF4ClientStats(Report):
     graph = StatGraph(
         name="Memory Usage", graph_id="memory",
         click_text="Memory usage on %date: %value")
-    series = dict()
-    for stat_entry in stats:
-      series[int(stat_entry.age / 1e3)] = int(stat_entry.RSS_size / 1024 / 1024)
+    series = {
+        int(stat_entry.age / 1e3): int(stat_entry.RSS_size / 1024 / 1024)
+        for stat_entry in stats
+    }
     graph.AddSeries(series, "RSS size in MB", max_samples)
-    series = dict()
-    for stat_entry in stats:
-      series[int(stat_entry.age / 1e3)] = int(stat_entry.VMS_size / 1024 / 1024)
+    series = {
+        int(stat_entry.age / 1e3): int(stat_entry.VMS_size / 1024 / 1024)
+        for stat_entry in stats
+    }
     graph.AddSeries(series, "VMS size in MB", max_samples)
     self.graphs.append(graph)
 
@@ -435,20 +433,20 @@ class AFF4ClientStats(Report):
     graph = StatGraph(
         name="Network Bytes Received", graph_id="nw_received",
         click_text="Network bytes received until %date: %value")
-    series = dict()
-    for stat_entry in stats:
-      series[int(stat_entry.age / 1e3)] = int(
-          stat_entry.bytes_received / 1024 / 1024)
+    series = {
+        int(stat_entry.age / 1e3): int(stat_entry.bytes_received / 1024 / 1024)
+        for stat_entry in stats
+    }
     graph.AddSeries(series, "Network Bytes Received in MB", max_samples)
     self.graphs.append(graph)
 
     graph = StatGraph(
         name="Network Bytes Sent", graph_id="nw_sent",
         click_text="Network bytes sent until %date: %value")
-    series = dict()
-    for stat_entry in stats:
-      series[
-          int(stat_entry.age / 1e3)] = int(stat_entry.bytes_sent / 1024 / 1024)
+    series = {
+        int(stat_entry.age / 1e3): int(stat_entry.bytes_sent / 1024 / 1024)
+        for stat_entry in stats
+    }
     graph.AddSeries(series, "Network Bytes Sent in MB", max_samples)
     self.graphs.append(graph)
 
@@ -518,10 +516,7 @@ class LogXAxisChart(CustomXAxisChart):
       if self.graph:
         for point in self.graph.data:
           # Note 0 and 1 are collapsed into a single category
-          if point.x_value > 0:
-            x_value = math.log10(point.x_value)
-          else:
-            x_value = point.x_value
+          x_value = math.log10(point.x_value) if point.x_value > 0 else point.x_value
           self.data.append([[x_value, point.y_value]])
           self.xaxis_ticks.append([x_value, self.FormatLabel(point.x_value)])
 
@@ -548,8 +543,8 @@ class FileStoreFileTypes(PieChart):
       self.graph = fd.Get(self.attribute)
 
       self.data = []
-      for sample in self.graph:
-        self.data.append(dict(label=sample.label, data=sample.y_value))
+      self.data.extend(
+          dict(label=sample.label, data=sample.y_value) for sample in self.graph)
     except (IOError, TypeError):
       pass
 

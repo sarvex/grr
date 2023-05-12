@@ -43,9 +43,7 @@ class BuilderBase(object):
       os.makedirs(path)
     except OSError as exc:
       # Necessary so we don't hide other errors such as permission denied.
-      if exc.errno == errno.EEXIST and os.path.isdir(path):
-        pass
-      else:
+      if exc.errno != errno.EEXIST or not os.path.isdir(path):
         raise
 
   def GenerateDirectory(self, input_dir=None, output_dir=None,
@@ -66,7 +64,7 @@ class BuilderBase(object):
   def GenerateFile(self, input_filename=None, output_filename=None):
     """Generates a file from a template, interpolating config values."""
     if input_filename is None:
-      input_filename = output_filename + ".in"
+      input_filename = f"{output_filename}.in"
     if output_filename[-3:] == ".in":
       output_filename = output_filename[:-3]
     data = open(input_filename, "rb").read()
@@ -255,13 +253,10 @@ class ClientDeployer(BuilderBase):
 
       new_config.Set("Client.build_time",
                      str(rdfvalue.RDFDatetime().Now()))
-      # Update the plugins list in the configuration file. Note that by
-      # stripping away directory information, the client will load these from
-      # its own install path.
-      plugins = []
-      for plugin in config_lib.CONFIG["Client.plugins"]:
-        plugins.append(os.path.basename(plugin))
-
+      plugins = [
+          os.path.basename(plugin)
+          for plugin in config_lib.CONFIG["Client.plugins"]
+      ]
       new_config.SetRaw("Client.plugins", plugins)
       new_config.Write()
 
@@ -272,22 +267,21 @@ class ClientDeployer(BuilderBase):
 
   def ValidateEndConfig(self, config, errors_fatal=True):
     """Given a generated client config, attempt to check for common errors."""
-    errors = []
     location = config.Get("Client.control_urls", context=self.context)
-    for url in location:
-      if not url.startswith("http"):
-        errors.append("Bad Client.control_urls specified %s" % url)
-
+    errors = [
+        f"Bad Client.control_urls specified {url}" for url in location
+        if not url.startswith("http")
+    ]
     keys = ["Client.executable_signing_public_key",
             "Client.driver_signing_public_key"]
     for key in keys:
       key_data = config.GetRaw(key, default=None, context=self.context)
       if key_data is None:
-        errors.append("Missing private %s." % key)
+        errors.append(f"Missing private {key}.")
         continue
 
       if not key_data.startswith("-----BEGIN PUBLIC"):
-        errors.append("Invalid private %s" % key)
+        errors.append(f"Invalid private {key}")
 
     certificate = config.GetRaw("CA.certificate", default=None,
                                 context=self.context)
@@ -297,15 +291,14 @@ class ClientDeployer(BuilderBase):
 
     for bad_opt in ["Client.private_key"]:
       if config.Get(bad_opt, context=self.context, default=""):
-        errors.append("Client cert in conf, this should be empty at deployment"
-                      " %s" % bad_opt)
+        errors.append(
+            f"Client cert in conf, this should be empty at deployment {bad_opt}")
 
-    if errors_fatal and errors:
-      for error in errors:
-        logging.error("Build Config Error: %s", error)
-      raise RuntimeError("Bad configuration generated. Terminating.")
-    else:
+    if not errors_fatal or not errors:
       return errors
+    for error in errors:
+      logging.error("Build Config Error: %s", error)
+    raise RuntimeError("Bad configuration generated. Terminating.")
 
   def MakeDeployableBinary(self, template_path, output_path=None):
     """Use the template to create a customized installer."""
@@ -327,30 +320,31 @@ class WindowsClientDeployer(ClientDeployer):
         config, errors_fatal=errors_fatal)
 
     if config.GetRaw("Logging.path").startswith("/"):
-      errors.append("Logging.path starts with /, probably has Unix path. %s" %
-                    config["Logging.path"])
+      errors.append(
+          f'Logging.path starts with /, probably has Unix path. {config["Logging.path"]}'
+      )
 
     if "Windows\\" in config.GetRaw("Logging.path"):
       errors.append("Windows in Logging.path, you probably want "
                     "%(WINDIR|env) instead")
 
     if not config["Client.binary_name"].endswith(".exe"):
-      errors.append("Missing .exe extension on binary_name %s" %
-                    config["Client.binary_name"])
+      errors.append(
+          f'Missing .exe extension on binary_name {config["Client.binary_name"]}'
+      )
 
     if not config["Nanny.binary"].endswith(".exe"):
       errors.append("Missing .exe extension on nanny_binary")
 
-    if errors_fatal and errors:
-      for error in errors:
-        logging.error("Build Config Error: %s", error)
-      raise RuntimeError("Bad configuration generated. Terminating.")
-    else:
+    if not errors_fatal or not errors:
       return errors
+    for error in errors:
+      logging.error("Build Config Error: %s", error)
+    raise RuntimeError("Bad configuration generated. Terminating.")
 
   def InterpolateVariableInBinary(self, stream, parameter):
     """Replace magic strings in the binary with config parameters."""
-    pattern = "<---------------- %s ------------------->" % parameter
+    pattern = f"<---------------- {parameter} ------------------->"
     pattern = pattern.encode("utf_16_le")
 
     replacement = config_lib.CONFIG.Get(parameter, context=self.context)
@@ -379,8 +373,6 @@ class WindowsClientDeployer(ClientDeployer):
 
     z_template = zipfile.ZipFile(open(template_path, "rb"))
 
-    completed_files = []  # Track which files we've copied already.
-
     # Change the name of the main binary to the configured name.
     client_bin_name = config_lib.CONFIG.Get(
         "Client.binary_name", context=context)
@@ -402,11 +394,13 @@ class WindowsClientDeployer(ClientDeployer):
 
     output_zip.writestr(client_bin_name, bin_dat.getvalue())
 
-    CopyFileInZip(z_template, "%s.manifest" % bin_name.filename, output_zip,
-                  "%s.manifest" % client_bin_name)
-    completed_files.append(bin_name.filename)
-    completed_files.append("%s.manifest" % bin_name.filename)
-
+    CopyFileInZip(
+        z_template,
+        f"{bin_name.filename}.manifest",
+        output_zip,
+        f"{client_bin_name}.manifest",
+    )
+    completed_files = [bin_name.filename, f"{bin_name.filename}.manifest"]
     # Change the name of the service binary to the configured name.
     service_template = z_template.getinfo("GRRservice.exe")
 
@@ -575,8 +569,8 @@ class LinuxClientDeployer(ClientDeployer):
                                             context=self.context)))
     if package_name == "grr-client":
       # Need to rename the template path or the move will fail.
-      shutil.move(template_binary_dir, "%s-template" % template_binary_dir)
-      template_binary_dir = "%s-template" % template_binary_dir
+      shutil.move(template_binary_dir, f"{template_binary_dir}-template")
+      template_binary_dir = f"{template_binary_dir}-template"
 
     self.EnsureDirExists(os.path.dirname(target_binary_dir))
     shutil.move(template_binary_dir, target_binary_dir)
@@ -595,19 +589,21 @@ class LinuxClientDeployer(ClientDeployer):
         [("grr-client", package_name)])
 
     # Generate directories for the /usr/sbin link.
-    self.EnsureDirExists(os.path.join(
-        template_path, "dist/debian/%s/usr/sbin" % package_name))
+    self.EnsureDirExists(
+        os.path.join(template_path, f"dist/debian/{package_name}/usr/sbin"))
 
     # Generate the upstart template.
     self.GenerateFile(
         os.path.join(template_path, "dist/debian/upstart.in/grr-client.conf"),
-        os.path.join(template_path, "dist/debian/%s.upstart" % package_name))
+        os.path.join(template_path, f"dist/debian/{package_name}.upstart"),
+    )
 
     # Generate the initd template. The init will not run if it detects upstart
     # is present.
     self.GenerateFile(
         os.path.join(template_path, "dist/debian/initd.in/grr-client"),
-        os.path.join(template_path, "dist/debian/%s.init" % package_name))
+        os.path.join(template_path, f"dist/debian/{package_name}.init"),
+    )
 
     # Clean up the template dirs.
     shutil.rmtree(deb_in_dir)

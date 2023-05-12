@@ -92,10 +92,7 @@ class MockWindowsProcess(object):
     for name in attrs:
       if hasattr(self, name):
         attr = getattr(self, name)
-        if callable(attr):
-          dic[name] = attr()
-        else:
-          dic[name] = attr
+        dic[name] = attr() if callable(attr) else attr
       else:
         dic[name] = None
     return dic
@@ -170,12 +167,10 @@ class ActionTest(test_lib.EmptyActionTest):
     request.iterator.number = 2
     while True:
       responses = self.RunAction("IteratedListDirectory", request)
-      results = responses[:-1]
-      if not results: break
-
-      for result in results:
-        iterated_results.append(result)
-
+      if results := responses[:-1]:
+        iterated_results.extend(iter(results))
+      else:
+        break
     for x, y in zip(non_iterated_results, iterated_results):
       # Reset the st_atime in the results to avoid potential flakiness.
       x.st_atime = y.st_atime = 0

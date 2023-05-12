@@ -176,10 +176,7 @@ class ACLToken(rdfvalue.RDFProtoStruct):
       raise ExpiryError("Token expired.")
 
   def __str__(self):
-    result = ""
-    if self.supervisor:
-      result = "******* SUID *******\n"
-
+    result = "******* SUID *******\n" if self.supervisor else ""
     return result + super(ACLToken, self).__str__()
 
   def SetUID(self):

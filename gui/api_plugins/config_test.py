@@ -42,7 +42,7 @@ def GetConfigMockClass(sections=None):
 
   for section_name, section in sections.iteritems():
     for parameter_name, parameter_data in section.iteritems():
-      name = "%s.%s" % (section_name, parameter_name)
+      name = f"{section_name}.{parameter_name}"
       descriptor = utils.DataObject(section=section_name, name=name)
       type_infos.append(descriptor)
 
@@ -59,17 +59,13 @@ def GetConfigMockClass(sections=None):
     try:
       return option_values[parameter]
     except KeyError:
-      if default is missing:
-        return default_values[parameter]
-      return default
+      return default_values[parameter] if default is missing else default
 
   def GetRaw(parameter, default=missing):
     try:
       return raw_values[parameter]
     except KeyError:
-      if default is missing:
-        return default_values[parameter]
-      return default
+      return default_values[parameter] if default is missing else default
 
   return {"Get": Get, "GetRaw": GetRaw, "type_infos": type_infos}
 

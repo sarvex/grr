@@ -108,13 +108,13 @@ class ActionPlugin(object):
     try:
       if self.message.args_rdf_name:
         if not self.in_rdfvalue:
-          raise RuntimeError("Did not expect arguments, got %s." %
-                             self.message.args_rdf_name)
+          raise RuntimeError(
+              f"Did not expect arguments, got {self.message.args_rdf_name}.")
 
         if self.in_rdfvalue.__name__ != self.message.args_rdf_name:
-          raise RuntimeError("Unexpected arg type %s != %s." %
-                             (self.message.args_rdf_name,
-                              self.in_rdfvalue.__name__))
+          raise RuntimeError(
+              f"Unexpected arg type {self.message.args_rdf_name} != {self.in_rdfvalue.__name__}."
+          )
 
         args = self.message.payload
 
@@ -122,8 +122,7 @@ class ActionPlugin(object):
       if (self._authentication_required and
           self.message.auth_state !=
           rdfvalue.GrrMessage.AuthorizationState.AUTHENTICATED):
-        raise RuntimeError("Message for %s was not Authenticated." %
-                           self.message.name)
+        raise RuntimeError(f"Message for {self.message.name} was not Authenticated.")
 
       pid = os.getpid()
       self.proc = psutil.Process(pid)
@@ -149,8 +148,6 @@ class ActionPlugin(object):
                      "%r: %s" % (e, e),
                      traceback.format_exc())
 
-    # We want to report back all errors and map Python exceptions to
-    # Grr Errors.
     except Exception as e:  # pylint: disable=broad-except
       self.SetStatus(rdfvalue.GrrStatus.ReturnedStatus.GENERIC_ERROR,
                      "%r: %s" % (e, e),
@@ -185,8 +182,7 @@ class ActionPlugin(object):
     Raises:
       KeyError: if not implemented.
     """
-    raise KeyError("Action %s not available on this platform." %
-                   self.message.name)
+    raise KeyError(f"Action {self.message.name} not available on this platform.")
 
   def SetStatus(self, status, message="", backtrace=None):
     """Set a status to report back to the server."""
@@ -444,8 +440,8 @@ class SuspendableAction(ActionPlugin):
     # An exception occured in the worker thread and it was terminated. We
     # re-raise it here.
     if self.worker.exception_status:
-      raise RuntimeError("Exception in child thread: %s" % (
-          self.worker.exception_status))
+      raise RuntimeError(
+          f"Exception in child thread: {self.worker.exception_status}")
 
     # Return the iterator
     self.SendReply(self.request.iterator,

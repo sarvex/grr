@@ -83,8 +83,7 @@ class PathTypeInfo(type_info.String):
   def Validate(self, value):
     value = super(PathTypeInfo, self).Validate(value)
     if self.must_exist and not os.access(value, os.R_OK):
-      raise type_info.TypeValueError(
-          "Path %s does not exist for %s" % (value, self.name))
+      raise type_info.TypeValueError(f"Path {value} does not exist for {self.name}")
 
     return value
 
@@ -384,10 +383,13 @@ config_lib.DEFINE_string(
     help="The debian package name.")
 
 
-config_lib.DEFINE_option(type_info.PathTypeInfo(
-    name="ClientBuilder.source", must_exist=False,
-    default=os.path.normpath(__file__ + "/../../.."),
-    help="The location of the source files."))
+config_lib.DEFINE_option(
+    type_info.PathTypeInfo(
+        name="ClientBuilder.source",
+        must_exist=False,
+        default=os.path.normpath(f"{__file__}/../../.."),
+        help="The location of the source files.",
+    ))
 
 config_lib.DEFINE_option(type_info.PathTypeInfo(
     name="ClientBuilder.executables_dir",

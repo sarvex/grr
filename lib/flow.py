@@ -165,25 +165,22 @@ class Responses(object):
         old_response_id = self.message.response_id
 
       if self.message.type == self.message.Type.MESSAGE:
-        # FIXME(scudette): Deprecate this once the client returns rdfvalue
-        # messages.
-        if not self.message.args_rdf_name:
+        if self.message.args_rdf_name:
+          # Flows send back RDFValues. These already contain sufficient context.
+          yield self.message.payload
+        else:
           client_action_name = self.request.request.name
           try:
             action_cls = actions.ActionPlugin.classes[client_action_name]
             if not action_cls.out_rdfvalue:
               raise RuntimeError(
-                  "Client action %s does not specify out_rdfvalue" %
-                  client_action_name)
+                  f"Client action {client_action_name} does not specify out_rdfvalue"
+              )
 
           except KeyError:
             raise RuntimeError("Unknown client action %s.", client_action_name)
 
           yield action_cls.out_rdfvalue(self.message.args)
-
-        else:
-          # Flows send back RDFValues. These already contain sufficient context.
-          yield self.message.payload
 
   def First(self):
     """A convenience method to return the first response."""
@@ -203,14 +200,18 @@ class Responses(object):
 
     logging.error(
         "No valid Status message.\nState:\n%s\n%s\n%s",
-        data_store.DB.ResolveRegex(
-            session_id.Add("state"),
-            "flow:.*", token=token),
+        data_store.DB.ResolveRegex(session_id.Add("state"),
+                                   "flow:.*",
+                                   token=token),
         data_store.DB.ResolveRegex(
             session_id.Add("state/request:%08X" % responses[0].request_id),
-            "flow:.*", token=token),
-        data_store.DB.ResolveRegex(
-            queues.FLOWS, "notify:%s" % session_id, token=token))
+            "flow:.*",
+            token=token,
+        ),
+        data_store.DB.ResolveRegex(queues.FLOWS,
+                                   f"notify:{session_id}",
+                                   token=token),
+    )
 
 
 class FakeResponses(Responses):
@@ -256,7 +257,7 @@ def StateHandler(next_state="End", auth_required=True):
     """Initialised Decorator."""
     # Allow next_state to be a single string
     if isinstance(next_state, basestring):
-      next_states = set([next_state])
+      next_states = {next_state}
     else:
       next_states = set(next_state)
 
@@ -349,7 +350,7 @@ class Behaviour(object):
     self.set = set()
     for arg in args:
       if arg not in self.LEXICON:
-        raise ValueError("Behaviour %s not known." % arg)
+        raise ValueError(f"Behaviour {arg} not known.")
 
       self.set.add(str(arg))
 
@@ -357,7 +358,7 @@ class Behaviour(object):
     other = str(other)
 
     if other not in self.LEXICON:
-      raise ValueError("Behaviour %s not known." % other)
+      raise ValueError(f"Behaviour {other} not known.")
 
     return self.__class__(other, *list(self.set))
 
@@ -375,7 +376,7 @@ class Behaviour(object):
   def IsSupported(self, other):
     """Ensure the other Behaviour supports all our Behaviours."""
     if not isinstance(other, self.__class__):
-      raise TypeError("Must be called on %s" % self.__class__)
+      raise TypeError(f"Must be called on {self.__class__}")
 
     return self.set.issubset(other.set)
 
@@ -552,8 +553,7 @@ class GRRFlow(aff4.AFF4Volume):
   def WriteState(self):
     if "w" in self.mode:
       if self.state.Empty():
-        raise IOError("Trying to write an empty state for flow %s." %
-                      self.urn)
+        raise IOError(f"Trying to write an empty state for flow {self.urn}.")
       self.Set(self.Schema.FLOW_STATE(self.state))
 
   def FlushMessages(self):
@@ -613,8 +613,11 @@ class GRRFlow(aff4.AFF4Volume):
           u"Completed with {0} results".format(len(self.runner.output)))
 
     else:
-      self.Notify("FlowStatus", self.client_id,
-                  "Flow %s completed" % self.__class__.__name__)
+      self.Notify(
+          "FlowStatus",
+          self.client_id,
+          f"Flow {self.__class__.__name__} completed",
+      )
 
   @StateHandler()
   def Start(self, unused_message=None):
@@ -783,7 +786,7 @@ class GRRFlow(aff4.AFF4Volume):
     # Is the required flow a known flow?
     if runner_args.flow_name not in GRRFlow.classes:
       stats.STATS.IncrementCounter("grr_flow_invalid_flow_count")
-      raise RuntimeError("Unable to locate flow %s" % runner_args.flow_name)
+      raise RuntimeError(f"Unable to locate flow {runner_args.flow_name}")
 
     # If no token is specified, use the default token.
     if not runner_args.HasField("token"):
@@ -827,15 +830,10 @@ class GRRFlow(aff4.AFF4Volume):
     # At this point we should exhaust all the keyword args. If any are left
     # over, we do not know what to do with them so raise.
     if kwargs:
-      raise type_info.UnknownArg(
-          "Unknown parameters to StartFlow: %s" % kwargs)
+      raise type_info.UnknownArg(f"Unknown parameters to StartFlow: {kwargs}")
 
     # Create a flow runner to run this flow with.
-    if parent_flow:
-      parent_runner = parent_flow.runner
-    else:
-      parent_runner = None
-
+    parent_runner = parent_flow.runner if parent_flow else None
     runner = flow_obj.CreateRunner(parent_runner=parent_runner,
                                    runner_args=runner_args,
                                    _store=_store or data_store.DB)
@@ -899,7 +897,7 @@ class GRRFlow(aff4.AFF4Volume):
                                    token=token)
 
     if not flow_obj:
-      raise FlowError("Could not terminate flow %s" % flow_id)
+      raise FlowError(f"Could not terminate flow {flow_id}")
 
     with flow_obj:
       runner = flow_obj.GetRunner()
@@ -945,17 +943,16 @@ class GRRFlow(aff4.AFF4Volume):
   @classmethod
   def GetCallingPrototypeAsString(cls):
     """Get a description of the calling prototype for this flow."""
-    output = []
-    output.append("flow.GRRFlow.StartFlow(client_id=client_id, ")
-    output.append("flow_name=\"%s\", " % cls.__name__)
     prototypes = []
     if cls.args_type:
-      for type_descriptor in cls.args_type.type_infos:
-        if not type_descriptor.hidden:
-          prototypes.append("%s=%s" % (type_descriptor.name,
-                                       type_descriptor.name))
-    output.append(", ".join(prototypes))
-    output.append(")")
+      prototypes.extend(f"{type_descriptor.name}={type_descriptor.name}"
+                        for type_descriptor in cls.args_type.type_infos
+                        if not type_descriptor.hidden)
+    output = [
+        "flow.GRRFlow.StartFlow(client_id=client_id, ",
+        "flow_name=\"%s\", " % cls.__name__,
+        *(", ".join(prototypes), ")"),
+    ]
     return "".join(output)
 
   @classmethod
@@ -977,18 +974,19 @@ class GRRFlow(aff4.AFF4Volume):
   @classmethod
   def GetArgsHelpAsString(cls):
     """Get a string description of the calling prototype for this function."""
-    output = ["  Call Spec:", "    %s" % cls.GetCallingPrototypeAsString(), ""]
-    arg_list = cls.GetArgs().items()
-    if not arg_list:
-      output.append("  Args: None")
-    else:
+    output = ["  Call Spec:", f"    {cls.GetCallingPrototypeAsString()}", ""]
+    if arg_list := cls.GetArgs().items():
       output.append("  Args:")
       for arg, val in arg_list:
-        output.append("    %s" % arg)
-        output.append("      description: %s" % val["description"])
-        output.append("      type: %s" % val["type"])
-        output.append("      default: %s" % val["default"])
-        output.append("")
+        output.extend((
+            f"    {arg}",
+            f'      description: {val["description"]}',
+            f'      type: {val["type"]}',
+            f'      default: {val["default"]}',
+            "",
+        ))
+    else:
+      output.append("  Args: None")
     return "\n".join(output)
 
 
@@ -999,7 +997,7 @@ class GRRGlobalFlow(GRRFlow):
   UI, but will instead be seen in Admin Flows.
   """
 
-  behaviours = GRRFlow.behaviours + "Global Flow" - "Client Flow"
+  behaviours = f"{GRRFlow.behaviours}Global Flow" - "Client Flow"
 
 
 class WellKnownFlow(GRRFlow):
@@ -1105,21 +1103,17 @@ class WellKnownFlow(GRRFlow):
     try:
       action = actions.ActionPlugin.classes[action_name]
     except KeyError:
-      raise RuntimeError("Client action %s not found." % action_name)
+      raise RuntimeError(f"Client action {action_name} not found.")
 
     if action.in_rdfvalue is None:
       if request:
-        raise RuntimeError("Client action %s does not expect args." %
-                           action_name)
-    else:
-      if request is None:
-        # Create a new rdf request.
-        request = action.in_rdfvalue(**kwargs)
-      else:
-        # Verify that the request type matches the client action requirements.
-        if not isinstance(request, action.in_rdfvalue):
-          raise RuntimeError("Client action expected %s but got %s" % (
-              action.in_rdfvalue, type(request)))
+        raise RuntimeError(f"Client action {action_name} does not expect args.")
+    elif request is None:
+      # Create a new rdf request.
+      request = action.in_rdfvalue(**kwargs)
+    elif not isinstance(request, action.in_rdfvalue):
+      raise RuntimeError(
+          f"Client action expected {action.in_rdfvalue} but got {type(request)}")
 
     if response_session_id is None:
       cls = GRRFlow.classes["IgnoreResponses"]
@@ -1176,7 +1170,7 @@ def EventHandler(source_restriction=False, auth_required=True,
       """A decorator that assists in enforcing EventListener restrictions."""
       if (auth_required and
           msg.auth_state != msg.AuthorizationState.AUTHENTICATED):
-        raise RuntimeError("Message from %s not authenticated." % msg.source)
+        raise RuntimeError(f"Message from {msg.source} not authenticated.")
 
       if (not allow_client_access and msg.source and
           rdfvalue.ClientURN.Validate(msg.source)):
@@ -1770,34 +1764,32 @@ class FrontEndServer(object):
       if msg.response_id != 0:
         result.append(msg)
 
-      # Well known flows:
+      elif msg.session_id.FlowName() in self.well_known_flows:
+        # This message should be processed directly on the front end.
+        flow = self.well_known_flows[msg.session_id.FlowName()]
+        flow.ProcessMessage(msg)
+        flow.HeartBeat()
+
+        # Remove the notification from the well known flows.
+        queue_manager.QueueManager(token=self.token).DeleteNotification(
+            msg.session_id)
+
+        # TODO(user): Deprecate in favor of 'well_known_flow_requests'
+        # metric.
+        stats.STATS.IncrementCounter("grr_well_known_flow_requests")
+
+        stats.STATS.IncrementCounter("well_known_flow_requests",
+                                     fields=[str(msg.session_id)])
       else:
-        if msg.session_id.FlowName() in self.well_known_flows:
-          # This message should be processed directly on the front end.
-          flow = self.well_known_flows[msg.session_id.FlowName()]
-          flow.ProcessMessage(msg)
-          flow.HeartBeat()
+        # Message should be queued to be processed in the backend.
 
-          # Remove the notification from the well known flows.
-          queue_manager.QueueManager(token=self.token).DeleteNotification(
-              msg.session_id)
+        # Well known flows have a response_id==0, but if we queue up the state
+        # as that it will overwrite some other message that is queued. So we
+        # change it to a random number here.
+        msg.response_id = utils.PRNG.GetULong()
 
-          # TODO(user): Deprecate in favor of 'well_known_flow_requests'
-          # metric.
-          stats.STATS.IncrementCounter("grr_well_known_flow_requests")
-
-          stats.STATS.IncrementCounter("well_known_flow_requests",
-                                       fields=[str(msg.session_id)])
-        else:
-          # Message should be queued to be processed in the backend.
-
-          # Well known flows have a response_id==0, but if we queue up the state
-          # as that it will overwrite some other message that is queued. So we
-          # change it to a random number here.
-          msg.response_id = utils.PRNG.GetULong()
-
-          # Queue the message in the data store.
-          result.append(msg)
+        # Queue the message in the data store.
+        result.append(msg)
 
     return result
 

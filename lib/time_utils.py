@@ -29,13 +29,9 @@ def DatetimeToWmiTime(dt):
 
   http://www.dmtf.org/sites/default/files/standards/documents/DSP0004_2.5.0.pdf
   """
-  td = dt.utcoffset()
-  if td:
+  if td := dt.utcoffset():
     offset = (td.seconds + (td.days * 60 * 60 * 24)) / 60
-    if offset >= 0:
-      str_offset = "+%03d" % offset
-    else:
-      str_offset = "%03d" % offset
+    str_offset = "+%03d" % offset if offset >= 0 else "%03d" % offset
   else:
     str_offset = "+000"
   return u"%04d%02d%02d%02d%02d%02d.%06d%s" % (dt.year, dt.month, dt.day,

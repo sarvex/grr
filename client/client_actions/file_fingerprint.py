@@ -32,29 +32,25 @@ class FingerprintFile(standard.ReadBuffer):
   def Run(self, args):
     """Fingerprint a file."""
     with vfs.VFSOpen(args.pathspec,
-                     progress_callback=self.Progress) as file_obj:
+                       progress_callback=self.Progress) as file_obj:
       fingerprinter = fingerprint.Fingerprinter(file_obj)
       response = rdfvalue.FingerprintResponse()
       response.pathspec = file_obj.pathspec
       if args.tuples:
         tuples = args.tuples
       else:
-        # There are none selected -- we will cover everything
-        tuples = list()
-        for k in self._fingerprint_types.iterkeys():
-          tuples.append(rdfvalue.FingerprintTuple(fp_type=k))
-
+        tuples = [
+            rdfvalue.FingerprintTuple(fp_type=k)
+            for k in self._fingerprint_types.iterkeys()
+        ]
       for finger in tuples:
-        hashers = [self._hash_types[h] for h in finger.hashers] or None
-        if finger.fp_type in self._fingerprint_types:
-          invoke = self._fingerprint_types[finger.fp_type]
-          res = invoke(fingerprinter, hashers)
-          if res:
-            response.matching_types.append(finger.fp_type)
-        else:
-          raise RuntimeError("Encountered unknown fingerprint type. %s" %
-                             finger.fp_type)
+        if finger.fp_type not in self._fingerprint_types:
+          raise RuntimeError(f"Encountered unknown fingerprint type. {finger.fp_type}")
 
+        invoke = self._fingerprint_types[finger.fp_type]
+        hashers = [self._hash_types[h] for h in finger.hashers] or None
+        if res := invoke(fingerprinter, hashers):
+          response.matching_types.append(finger.fp_type)
       # Structure of the results is a list of dicts, each containing the
       # name of the hashing method, hashes for enabled hash algorithms,
       # and auxilliary data where present (e.g. signature blobs).

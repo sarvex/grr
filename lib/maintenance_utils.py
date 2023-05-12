@@ -163,16 +163,15 @@ def CreateBinaryConfigPaths(token=None):
     # We weren't already initialized, create all directories we will need.
     for platform in SUPPORTED_PLATFORMS:
       for arch in SUPPORTED_ARCHICTECTURES:
-        client_context = ["Platform:%s" % platform.title(),
-                          "Arch:%s" % arch]
+        client_context = [f"Platform:{platform.title()}", f"Arch:{arch}"]
 
         aff4_paths = config_lib.CONFIG.Get("MemoryDriver.aff4_paths",
                                            context=client_context)
         for aff4_path in aff4_paths:
           required_urns.add(rdfvalue.RDFURN(aff4_path).Basename())
 
-      required_urns.add("aff4:/config/executables/%s/agentupdates" % platform)
-      required_urns.add("aff4:/config/executables/%s/installers" % platform)
+      required_urns.add(f"aff4:/config/executables/{platform}/agentupdates")
+      required_urns.add(f"aff4:/config/executables/{platform}/installers")
 
     existing_urns = [x["urn"] for x in aff4.FACTORY.Stat(list(required_urns),
                                                          token=token)]

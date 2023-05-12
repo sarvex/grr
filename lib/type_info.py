@@ -147,8 +147,9 @@ class RDFValueType(TypeInfoObject):
       try:
         return self.rdfclass(value)
       except rdfvalue.InitializeError:
-        raise TypeValueError("Value for arg %s should be an %s" % (
-            self.name, self.rdfclass.__class__.__name__))
+        raise TypeValueError(
+            f"Value for arg {self.name} should be an {self.rdfclass.__class__.__name__}"
+        )
 
     return value
 
@@ -181,8 +182,7 @@ class TypeDescriptorSet(object):
     return iter(self.descriptors)
 
   def __str__(self):
-    result = "\n ".join(["%s: %s" % (x.name, x.description)
-                         for x in self.descriptors])
+    result = "\n ".join([f"{x.name}: {x.description}" for x in self.descriptors])
 
     return "<TypeDescriptorSet for %s>\n %s\n</TypeDescriptorSet>\n" % (
         self.__class__.__name__, result)
@@ -281,7 +281,7 @@ class Bool(TypeInfoObject):
     if string.lower() in ("true", "yes", "y"):
       return True
 
-    raise TypeValueError("%s is not recognized as a boolean value." % string)
+    raise TypeValueError(f"{string} is not recognized as a boolean value.")
 
 
 class List(TypeInfoObject):
@@ -299,7 +299,7 @@ class List(TypeInfoObject):
       raise TypeValueError("Value must be an iterable not a string.")
 
     elif not isinstance(value, (list, tuple)):
-      raise TypeValueError("%s not a valid List" % utils.SmartStr(value))
+      raise TypeValueError(f"{utils.SmartStr(value)} not a valid List")
 
     else:
       for val in value:
@@ -329,13 +329,12 @@ class String(TypeInfoObject):
   _type = unicode
 
   def __init__(self, **kwargs):
-    defaults = dict(default="")
-    defaults.update(kwargs)
+    defaults = dict(default="") | kwargs
     super(String, self).__init__(**defaults)
 
   def Validate(self, value):
     if not isinstance(value, basestring):
-      raise TypeValueError("%s: %s not a valid string" % (self.name, value))
+      raise TypeValueError(f"{self.name}: {value} not a valid string")
 
     # A String means a unicode String. We must be dealing with unicode strings
     # here and the input must be encodable as a unicode object.
@@ -352,7 +351,7 @@ class Bytes(String):
 
   def Validate(self, value):
     if not isinstance(value, str):
-      raise TypeValueError("%s not a valid string" % value)
+      raise TypeValueError(f"{value} not a valid string")
 
     return value
 
@@ -368,7 +367,7 @@ class Integer(TypeInfoObject):
       value = 0
 
     if not isinstance(value, (int, long)):
-      raise TypeValueError("Invalid value %s for Integer" % value)
+      raise TypeValueError(f"Invalid value {value} for Integer")
 
     return long(value)
 
@@ -376,7 +375,7 @@ class Integer(TypeInfoObject):
     try:
       return long(string)
     except ValueError:
-      raise TypeValueError("Invalid value %s for Integer" % string)
+      raise TypeValueError(f"Invalid value {string} for Integer")
 
 
 class Float(Integer):
@@ -387,7 +386,7 @@ class Float(Integer):
     try:
       value = float(value)
     except (ValueError, TypeError):
-      raise TypeValueError("Invalid value %s for Float" % value)
+      raise TypeValueError(f"Invalid value {value} for Float")
 
     return value
 
@@ -395,7 +394,7 @@ class Float(Integer):
     try:
       return float(string)
     except (ValueError, TypeError):
-      raise TypeValueError("Invalid value %s for Float" % string)
+      raise TypeValueError(f"Invalid value {string} for Float")
 
 
 class Choice(TypeInfoObject):
@@ -410,7 +409,7 @@ class Choice(TypeInfoObject):
     self.validator.Validate(value)
 
     if value not in self.choices:
-      raise TypeValueError("%s not a valid instance string." % value)
+      raise TypeValueError(f"{value} not a valid instance string.")
 
     return value
 
@@ -441,7 +440,7 @@ class MultiChoice(TypeInfoObject):
 
     for value in values:
       if value not in self.choices:
-        raise TypeValueError("%s not a valid instance string." % value)
+        raise TypeValueError(f"{value} not a valid instance string.")
     if len(values) != len(set(values)):
-      raise TypeValueError("Duplicate choice in: %s." % values)
+      raise TypeValueError(f"Duplicate choice in: {values}.")
     return values

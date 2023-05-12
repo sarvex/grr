@@ -232,7 +232,7 @@ class GRRFuseTest(GRRFuseTestBase):
       pass
 
   def ClientPathToAFF4Path(self, client_side_path):
-    return "/%s/fs/os%s" % (self.client_name, client_side_path)
+    return f"/{self.client_name}/fs/os{client_side_path}"
 
   def StartFlowAndWait(self, client_id, token=None,
                        timeout=None, **flow_args):
@@ -418,21 +418,14 @@ class GRRFuseTest(GRRFuseTestBase):
       if self.done:
         break
 
-      if client_mock:
-        client_processed = client_mock.Next()
-      else:
-        client_processed = 0
-
+      client_processed = client_mock.Next() if client_mock else 0
       flows_run = []
       for flow_run in worker_mock.Next():
         self.total_flows.add(flow_run)
         flows_run.append(flow_run)
 
-      if client_processed == 0 and not flows_run:
-        # If we're stopping because there's nothing in the queue, don't stop
-        # running if we've more tests to do.
-        if self.done:
-          break
+      if client_processed == 0 and not flows_run and self.done:
+        break
 
 
 def main(argv):

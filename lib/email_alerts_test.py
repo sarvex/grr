@@ -31,7 +31,7 @@ class SendEmailTests(test_lib.GRRBaseTest):
     self.assertFalse("CC:" in msg)
 
     # Single fully qualified address as rdfvalue.DomainEmailAddress
-    to_address = rdfvalue.DomainEmailAddress("testto@%s" % testdomain)
+    to_address = rdfvalue.DomainEmailAddress(f"testto@{testdomain}")
     from_address = "me@example.com"
     subject = "test"
     message = ""
@@ -51,12 +51,14 @@ class SendEmailTests(test_lib.GRRBaseTest):
     c_from, c_to, message = smtp_conn.sendmail.call_args[0]
     self.assertEqual(from_address, c_from)
     self.assertEqual(to_address_expected, c_to)
-    self.assertTrue("CC: testcc@%s" % testdomain in message)
+    self.assertTrue(f"CC: testcc@{testdomain}" in message)
 
     # Multiple unqualified to addresses as rdfvalue.DomainEmailAddress, one cc
-    to_address = [rdfvalue.DomainEmailAddress("testto@%s" % testdomain),
-                  rdfvalue.DomainEmailAddress("abc@%s" % testdomain),
-                  rdfvalue.DomainEmailAddress("def@%s" % testdomain)]
+    to_address = [
+        rdfvalue.DomainEmailAddress(f"testto@{testdomain}"),
+        rdfvalue.DomainEmailAddress(f"abc@{testdomain}"),
+        rdfvalue.DomainEmailAddress(f"def@{testdomain}"),
+    ]
     to_address_expected = [
         x + testdomain for x in ["testto@", "abc@", "def@"]]
     cc_address = "testcc"
@@ -65,7 +67,7 @@ class SendEmailTests(test_lib.GRRBaseTest):
     c_from, c_to, message = smtp_conn.sendmail.call_args[0]
     self.assertEqual(from_address, c_from)
     self.assertEqual(to_address_expected, c_to)
-    self.assertTrue("CC: testcc@%s" % testdomain in message)
+    self.assertTrue(f"CC: testcc@{testdomain}" in message)
 
     # Multiple unqualified to addresses, two cc, message_id set
     to_address = "testto,abc,def"
@@ -78,9 +80,8 @@ class SendEmailTests(test_lib.GRRBaseTest):
     c_from, c_to, message = smtp_conn.sendmail.call_args[0]
     self.assertEqual(from_address, c_from)
     self.assertEqual(to_address_expected, c_to)
-    self.assertTrue("CC: testcc@%s,testcc2@%s" % (testdomain, testdomain) in
-                    message)
-    self.assertTrue("Message-ID: %s" % email_msg_id)
+    self.assertTrue(f"CC: testcc@{testdomain},testcc2@{testdomain}" in message)
+    self.assertTrue(f"Message-ID: {email_msg_id}")
 
     # Multiple address types, two cc, no default domain
     config_lib.CONFIG.Set("Logging.domain", None)
@@ -92,8 +93,7 @@ class SendEmailTests(test_lib.GRRBaseTest):
     c_from, c_to, message = smtp_conn.sendmail.call_args[0]
     self.assertEqual(from_address, c_from)
     self.assertEqual(to_address_expected, c_to)
-    self.assertTrue("CC: testcc@%s,testcc2@%s" % (testdomain, testdomain) in
-                    message)
+    self.assertTrue(f"CC: testcc@{testdomain},testcc2@{testdomain}" in message)
 
 
 def main(argv):

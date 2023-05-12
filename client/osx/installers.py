@@ -38,7 +38,7 @@ class OSXInstaller(installer.Installer):
             data, flags=re.DOTALL)
 
       if m:
-        cert = m.group(1).replace("\t", "")
+        cert = m[1].replace("\t", "")
         logging.info("Found a valid private key!")
         new_config.Set("Client.private_key", cert)
         new_config.Write()

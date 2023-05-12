@@ -161,9 +161,12 @@ class SemanticProtoFormRenderer(renderers.TemplateRenderer):
       # Ignore hidden labeled members.
       if (rdfvalue.SemanticDescriptor.Labels.HIDDEN not in descriptor.labels and
           "HIDDEN" not in descriptor.labels):
-        kwargs = dict(descriptor=descriptor, opened=self.opened,
-                      container=self.proto_obj,
-                      prefix=self.prefix + "-" + descriptor.name)
+        kwargs = dict(
+            descriptor=descriptor,
+            opened=self.opened,
+            container=self.proto_obj,
+            prefix=f"{self.prefix}-{descriptor.name}",
+        )
 
         if self.proto_obj.HasField(descriptor.name):
           kwargs["value"] = getattr(self.proto_obj, descriptor.name)
@@ -193,7 +196,7 @@ class SemanticProtoFormRenderer(renderers.TemplateRenderer):
 
       if name.endswith("[]"):
         # This was an array value, e.g. multi select box and we need to strip.
-        name = name[0:-2]
+        name = name[:-2]
 
       # Strip the prefix from the name
       field = name[len(self.prefix) + 1:].split("-")[0]
@@ -204,8 +207,10 @@ class SemanticProtoFormRenderer(renderers.TemplateRenderer):
         continue
 
       type_renderer = GetTypeDescriptorRenderer(descriptor)(
-          descriptor=descriptor, container=self.proto_obj,
-          prefix=self.prefix + "-" + descriptor.name)
+          descriptor=descriptor,
+          container=self.proto_obj,
+          prefix=f"{self.prefix}-{descriptor.name}",
+      )
 
       # Delegate the arg parsing to the type descriptor renderer and set it
       # into the protobuf.
@@ -353,7 +358,7 @@ class IntegerTypeFormRenderer(StringTypeFormRenderer):
     try:
       return long(result)
     except ValueError as e:
-      raise ValueError("Unable to parse field %s: %s" % (self.prefix, e))
+      raise ValueError(f"Unable to parse field {self.prefix}: {e}")
 
 
 class SignedIntegerTypeFormRenderer(IntegerTypeFormRenderer):
@@ -383,7 +388,7 @@ class FloatTypeFormRenderer(StringTypeFormRenderer):
     try:
       return float(result)
     except ValueError as e:
-      raise ValueError("Unable to parse field %s: %s" % (self.prefix, e))
+      raise ValueError(f"Unable to parse field {self.prefix}: {e}")
 
 
 class EmbeddedProtoFormRenderer(TypeDescriptorFormRenderer):
@@ -471,15 +476,17 @@ class EmbeddedProtoFormRenderer(TypeDescriptorFormRenderer):
         continue
 
       type_renderer = GetTypeDescriptorRenderer(descriptor)(
-          descriptor=descriptor, container=self.container,
-          prefix=self.prefix + "-" + descriptor.name)
+          descriptor=descriptor,
+          container=self.container,
+          prefix=f"{self.prefix}-{descriptor.name}",
+      )
 
       # Delegate the arg parsing to the type descriptor renderer and set it
       # into the protobuf.
       try:
         result.Set(field, type_renderer.ParseArgs(request))
       except ValueError as e:
-        raise ValueError("Unable to set field %s: %s" % (field, e))
+        raise ValueError(f"Unable to set field {field}: {e}")
 
     return result
 
@@ -526,10 +533,7 @@ class RepeatedFieldFormRenderer(TypeDescriptorFormRenderer):
 
   @property
   def default_data_count(self):
-    if self.add_element_on_first_show:
-      return 1
-    else:
-      return 0
+    return 1 if self.add_element_on_first_show else 0
 
   def Layout(self, request, response):
     """Build form elements for repeated fields."""
@@ -556,21 +560,19 @@ class RepeatedFieldFormRenderer(TypeDescriptorFormRenderer):
 
     # The form tells us how many items there should be. Note that they can be
     # sparse since when an item is removed, the count is not decremented.
-    count = int(request.REQ.get("%s_count" % self.prefix,
-                                self.default_data_count))
+    count = int(request.REQ.get(f"{self.prefix}_count", self.default_data_count))
 
     # Parse out the items and fill them into the result. Note that we do not
     # support appending empty repeated fields. Such fields may happen by adding
     # and removing the form for the repeated member.
     for index in range(count):
-      delegate_prefix = "%s-%s" % (self.prefix, index)
+      delegate_prefix = f"{self.prefix}-{index}"
       delegate = self.descriptor.delegate
       delegate_renderer = GetTypeDescriptorRenderer(delegate)(
           descriptor=delegate, opened=True, container=self.container,
           prefix=delegate_prefix)
 
-      child = delegate_renderer.ParseArgs(request)
-      if child:
+      if child := delegate_renderer.ParseArgs(request):
         result.append(child)
 
     return result
@@ -582,7 +584,7 @@ class RepeatedFieldFormRenderer(TypeDescriptorFormRenderer):
     self.owner = request.REQ.get("owner")
     self.field = request.REQ.get("field")
 
-    self.delegate_prefix = "%s-%s" % (self.prefix, self.index)
+    self.delegate_prefix = f"{self.prefix}-{self.index}"
 
     # Recover the type descriptor of this field from the post args.
     cls = rdfvalue.RDFValue.classes[self.owner]
@@ -677,10 +679,7 @@ class ProtoBoolFormRenderer(TypeDescriptorFormRenderer):
     if value is None:
       return
 
-    if value.lower() in ["yes", "true"]:
-      return True
-
-    return False
+    return value.lower() in ["yes", "true"]
 
 
 class RDFDatetimeFormRenderer(StringTypeFormRenderer):
@@ -789,8 +788,7 @@ class OptionFormRenderer(TypeDescriptorFormRenderer):
     """Override this to parse the specific option selected."""
 
   def ParseArgs(self, request):
-    option = request.REQ.get("%s-option" % self.prefix)
-    if option:
+    if option := request.REQ.get(f"{self.prefix}-option"):
       return self.ParseOption(option, request)
 
   def RenderOption(self, option, request, response):
@@ -804,7 +802,7 @@ class OptionFormRenderer(TypeDescriptorFormRenderer):
 
   def RenderAjax(self, request, response):
     self.prefix = request.REQ.get("prefix", self.option_name)
-    option = request.REQ.get(self.prefix + "-option", None)
+    option = request.REQ.get(f"{self.prefix}-option", None)
 
     self.RenderOption(option, request, response)
 
@@ -839,11 +837,10 @@ class MultiFormRenderer(renderers.TemplateRenderer):
   def ParseArgs(self, request):
     """Pareses all children for the request."""
     result = []
-    count = int(request.REQ.get("%s_count" % self.option_name, 0))
+    count = int(request.REQ.get(f"{self.option_name}_count", 0))
     for item in range(count):
-      parsed_item = self.child_renderer(
-          prefix="%s_%s" % (self.option_name, item),
-          item=item).ParseArgs(request)
+      parsed_item = self.child_renderer(prefix=f"{self.option_name}_{item}",
+                                        item=item).ParseArgs(request)
       if parsed_item is not None:
         result.append(parsed_item)
 
@@ -856,9 +853,10 @@ class MultiFormRenderer(renderers.TemplateRenderer):
 
     if self.item is not None:
       self.child = self.child_renderer(
-          prefix="%s_%s" % (self.option_name, self.item),
+          prefix=f"{self.option_name}_{self.item}",
           item=self.item,
-          default_item_type=default_item_type).RawHTML(request)
+          default_item_type=default_item_type,
+      ).RawHTML(request)
 
       self.CallJavascript(response, "MultiFormRenderer.LayoutItem",
                           option=self.option_name)
@@ -900,12 +898,7 @@ class MultiSelectListRenderer(RepeatedFieldFormRenderer):
 
   def ParseArgs(self, request):
     """Parse all the post parameters and build a list."""
-    result = []
-    for k, v in request.REQ.iteritems():
-      if k.startswith(self.prefix):
-        result.append(v)
-
-    return result
+    return [v for k, v in request.REQ.iteritems() if k.startswith(self.prefix)]
 
 
 class UnionMultiFormRenderer(OptionFormRenderer):
@@ -947,9 +940,10 @@ class UnionMultiFormRenderer(OptionFormRenderer):
     self.help = union_field_enum.description
 
     self.options = []
-    for name, value in sorted(union_field_enum.enum.iteritems(),
-                              key=lambda x: int(x[1])):
-      self.options.append((int(value), value.description or name))
+    self.options.extend(
+        (int(value), value.description or name)
+        for name, value in sorted(union_field_enum.enum.iteritems(),
+                                  key=lambda x: int(x[1])))
 
   def ParseOption(self, option, request):
     union_field_enum = self.type.type_infos.get(self.union_by_field)

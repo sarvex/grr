@@ -122,7 +122,7 @@ class Filename(ConfigFilter):
     try:
       return open(data, "rb").read(1024000)
     except IOError as e:
-      raise FilterError("%s: %s" % (data, e))
+      raise FilterError(f"{data}: {e}")
 
 
 class UnixPath(ConfigFilter):
@@ -337,7 +337,7 @@ class YamlParser(GRRConfigParser):
 
     if fd:
       data = yaml.safe_load(fd) or OrderedYamlDict()
-    elif filename:
+    else:
       data = yaml.safe_load(open(filename, "rb")) or OrderedYamlDict()
     for include in data.pop("ConfigIncludes", []):
       path = os.path.join(os.path.dirname(filename), include)
@@ -516,7 +516,7 @@ class StringInterpolator(lexer.Lexer):
 
   def Error(self, e):
     """Parse errors are fatal."""
-    raise ConfigFormatError("While parsing %s: %s" % (self.parameter, e))
+    raise ConfigFormatError(f"While parsing {self.parameter}: {e}")
 
   def StartExpression(self, **_):
     """Start processing a new expression."""
@@ -526,8 +526,8 @@ class StringInterpolator(lexer.Lexer):
   def EndLiteralExpression(self, **_):
     if len(self.stack) <= 1:
       raise lexer.ParseError(
-          "Unbalanced literal sequence: Can not expand '%s'" %
-          self.processed_buffer)
+          f"Unbalanced literal sequence: Can not expand '{self.processed_buffer}'"
+      )
 
     arg = self.stack.pop(-1)
     self.stack[-1] += arg
@@ -553,12 +553,12 @@ class StringInterpolator(lexer.Lexer):
     # exactly match the number of (.
     if len(self.stack) <= 1:
       raise lexer.ParseError(
-          "Unbalanced parenthesis: Can not expand '%s'" % self.processed_buffer)
+          f"Unbalanced parenthesis: Can not expand '{self.processed_buffer}'")
 
     # This is the full parameter name: e.g. Logging.path
     parameter_name = self.stack.pop(-1)
     if "." not in parameter_name:
-      parameter_name = "%s.%s" % (self.default_section, parameter_name)
+      parameter_name = f"{self.default_section}.{parameter_name}"
 
     final_value = self.config.Get(parameter_name, context=self.context)
     if final_value is None:
@@ -594,7 +594,7 @@ class GrrConfigManager(object):
     self.validated = set()
     self.writeback = None
     self.writeback_data = OrderedYamlDict()
-    self.global_override = dict()
+    self.global_override = {}
     self.context_descriptions = {}
     self.constants = set()
 
@@ -686,7 +686,7 @@ class GrrConfigManager(object):
     validation_errors = {}
     for section in sections:
       for descriptor in self.type_infos:
-        if descriptor.name.startswith(section + "."):
+        if descriptor.name.startswith(f"{section}."):
           try:
             self.Get(descriptor.name)
           except (Error, ValueError) as e:
@@ -739,8 +739,7 @@ class GrrConfigManager(object):
     if self.writeback is None:
       logging.warn("Attempting to modify a read only config object.")
     if name in self.constants:
-      raise ConstModificationError(
-          "Attempting to modify constant value %s" % name)
+      raise ConstModificationError(f"Attempting to modify constant value {name}")
 
     self.writeback_data[name] = value
     self.FlushCache()
@@ -765,8 +764,7 @@ class GrrConfigManager(object):
       logging.warn("Attempting to modify a read only config object for %s.",
                    name)
     if name in self.constants:
-      raise ConstModificationError(
-          "Attempting to modify constant value %s" % name)
+      raise ConstModificationError(f"Attempting to modify constant value {name}")
 
     writeback_data = self.writeback_data
 
@@ -817,7 +815,7 @@ class GrrConfigManager(object):
     """
     if self.initialized:
       raise AlreadyInitializedError(
-          "Config was already initialized when defining %s" % descriptor.name)
+          f"Config was already initialized when defining {descriptor.name}")
 
     descriptor.section = descriptor.name.split(".")[0]
     if descriptor.name in self.type_infos:
@@ -878,8 +876,7 @@ class GrrConfigManager(object):
           v = v.strip()
 
         if k in self.constants:
-          raise ConstModificationError(
-              "Attempting to modify constant value %s" % k)
+          raise ConstModificationError(f"Attempting to modify constant value {k}")
 
         raw_data[k] = v
 
@@ -894,10 +891,7 @@ class GrrConfigManager(object):
 
     # If url is a filename:
     extension = os.path.splitext(path)[1]
-    if extension in [".yaml", ".yml"]:
-      return YamlParser
-
-    return ConfigFileParser
+    return YamlParser if extension in [".yaml", ".yml"] else ConfigFileParser
 
   def LoadSecondaryConfig(self, url):
     """Loads an additional configuration file.
@@ -969,8 +963,7 @@ class GrrConfigManager(object):
     elif filename is not None:
       self.parser = self.LoadSecondaryConfig(filename)
       if must_exist and not self.parser.parsed:
-        raise ConfigFormatError(
-            "Unable to parse config file %s" % filename)
+        raise ConfigFormatError(f"Unable to parse config file {filename}")
 
     elif data is not None:
       self.parser = parser(data=data)
@@ -984,7 +977,7 @@ class GrrConfigManager(object):
   def __getitem__(self, name):
     """Retrieve a configuration value after suitable interpolations."""
     if name not in self.type_infos:
-      raise UnknownOption("Config parameter %s not known." % name)
+      raise UnknownOption(f"Config parameter {name} not known.")
 
     return self.Get(name)
 
@@ -1021,15 +1014,13 @@ class GrrConfigManager(object):
       RuntimeError: if a value is retrieved before the config is initialized.
       ValueError: if a bad context is passed.
     """
-    if not self.initialized:
-      if name not in self.constants:
-        raise RuntimeError("Error while retrieving %s: "
-                           "Configuration hasn't been initialized yet." % name)
-    if context:
-      # Make sure it's not just a string and is iterable.
-      if (isinstance(context, basestring) or
-          not isinstance(context, collections.Iterable)):
-        raise ValueError("context should be a list, got %s" % str(context))
+    if not self.initialized and name not in self.constants:
+      raise RuntimeError(
+          f"Error while retrieving {name}: Configuration hasn't been initialized yet."
+      )
+    if context and (isinstance(context, basestring)
+                    or not isinstance(context, collections.Iterable)):
+      raise ValueError(f"context should be a list, got {str(context)}")
 
     calc_context = context
     # Use a default global context if context is not provided.
@@ -1059,7 +1050,7 @@ class GrrConfigManager(object):
       if default is not utils.NotAValue:
         return default
 
-      raise ConfigFormatError("While parsing %s: %s" % (name, e))
+      raise ConfigFormatError(f"While parsing {name}: {e}")
 
     try:
       new_value = type_info_obj.Validate(return_value)
@@ -1095,9 +1086,10 @@ class GrrConfigManager(object):
           yield context_raw_data, value, path + [element]
 
         # Recurse into the new context configuration.
-        for context_raw_data, value, new_path in self._ResolveContext(
-            context, name, context_raw_data, path=path + [element]):
-          yield context_raw_data, value, new_path
+        yield from self._ResolveContext(context,
+                                        name,
+                                        context_raw_data,
+                                        path=path + [element])
 
   def _GetValue(self, name, context, default=utils.NotAValue):
     """Search for the value based on the context."""
@@ -1107,12 +1099,11 @@ class GrrConfigManager(object):
     if default is not utils.NotAValue:
       value = default
 
-    # Take the default from the definition.
     elif name in self.defaults:
       value = self.defaults[name]
 
     else:
-      raise UnknownOption("Option %s not defined." % name)
+      raise UnknownOption(f"Option {name} not defined.")
 
     # We resolve the required key with the default raw data, and then iterate
     # over all elements in the context to see if there are overriding context
@@ -1122,12 +1113,7 @@ class GrrConfigManager(object):
       value = new_value
       container = self.raw_data
 
-    # Now check for any contexts. We enumerate all the possible resolutions and
-    # sort by their path length. The last one will be the match with the deepest
-    # path (i.e .the most specific match).
-    matches = list(self._ResolveContext(context, name, self.raw_data))
-
-    if matches:
+    if matches := list(self._ResolveContext(context, name, self.raw_data)):
       # Sort by the length of the path - longest match path will be at the end.
       matches.sort(key=lambda x: len(x[2]))
       value = matches[-1][1]
@@ -1191,11 +1177,7 @@ class GrrConfigManager(object):
     return value
 
   def GetSections(self):
-    result = set()
-    for descriptor in self.type_infos:
-      result.add(descriptor.section)
-
-    return result
+    return {descriptor.section for descriptor in self.type_infos}
 
   def MatchBuildContext(self, target_os, target_arch, target_package):
     """Return true if target_platforms matches the supplied parameters.

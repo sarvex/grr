@@ -136,14 +136,14 @@ class ContainerFileTable(renderers.TableRenderer):
     limit = max(self.max_items, end_row)
 
     key = utils.SmartUnicode(container_urn)
-    key += ":" + query_expression + ":" + str(limit)
+    key += f":{query_expression}:{str(limit)}"
     try:
       children = self.content_cache.Get(key)
     except KeyError:
-      children = {}
-      for c in sorted(container.Query(query_expression, limit=limit)):
-        children[utils.SmartUnicode(c.urn)] = c
-
+      children = {
+          utils.SmartUnicode(c.urn): c
+          for c in sorted(container.Query(query_expression, limit=limit))
+      }
       self.content_cache.Put(key, children)
 
     child_names = children.keys()
@@ -164,7 +164,7 @@ class ContainerFileTable(renderers.TableRenderer):
 
     for child_urn in child_names[row_index:]:
       fd = children[child_urn]
-      row_attributes = dict()
+      row_attributes = {}
 
       # Add the fd to all the columns
       for column in self.columns:
@@ -223,7 +223,7 @@ class ContainerNavigator(renderers.TreeRenderer):
     # NOTE: Although all AFF4Volumes are also containers, this gui element is
     # really only suitable for showing AFF4Collection objects which are not very
     # large, since we essentially list all members.
-    query_expression = ("subject matches '%s.+'" % utils.EscapeRegex(urn))
+    query_expression = f"subject matches '{utils.EscapeRegex(urn)}.+'"
 
     branches = set()
 

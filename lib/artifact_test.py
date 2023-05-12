@@ -63,15 +63,20 @@ class TestCmdProcessor(parsers.CommandParser):
             knowledge_base):
     _ = cmd, args, stdout, stderr, return_val, time_taken, knowledge_base
     installed = rdfvalue.SoftwarePackage.InstallState.INSTALLED
-    soft = rdfvalue.SoftwarePackage(name="Package1", description="Desc1",
-                                    version="1", architecture="amd64",
-                                    install_state=installed)
-    yield soft
-    soft = rdfvalue.SoftwarePackage(name="Package2", description="Desc2",
-                                    version="1", architecture="i386",
-                                    install_state=installed)
-    yield soft
-
+    yield rdfvalue.SoftwarePackage(
+        name="Package1",
+        description="Desc1",
+        version="1",
+        architecture="amd64",
+        install_state=installed,
+    )
+    yield rdfvalue.SoftwarePackage(
+        name="Package2",
+        description="Desc2",
+        version="1",
+        architecture="i386",
+        install_state=installed,
+    )
     # Also yield something random so we can test return type filtering.
     yield rdfvalue.StatEntry()
 
@@ -185,7 +190,7 @@ class ArtifactTest(ArtifactBaseTest):
     if client_mock is None:
       client_mock = self.MockClient(client_id=self.client_id)
 
-    output_name = "/analysis/output/%s" % int(time.time())
+    output_name = f"/analysis/output/{int(time.time())}"
 
     for _ in test_lib.TestFlowHelper(
         "ArtifactCollectorFlow", client_mock=client_mock, output=output_name,
@@ -209,20 +214,17 @@ class GRRArtifactTest(ArtifactTest):
 
       if operator not in ["Append", "Overwrite"]:
         raise artifact_lib.ArtifactDefinitionError(
-            "Bad RDFMapping, unknown operator %s in %s" %
-            (operator, rdf_name))
+            f"Bad RDFMapping, unknown operator {operator} in {rdf_name}")
 
       if aff4_type not in aff4.AFF4Object.classes:
         raise artifact_lib.ArtifactDefinitionError(
-            "Bad RDFMapping, invalid AFF4 Object %s in %s" %
-            (aff4_type, rdf_name))
+            f"Bad RDFMapping, invalid AFF4 Object {aff4_type} in {rdf_name}")
 
       attr = getattr(aff4.AFF4Object.classes[aff4_type].SchemaCls,
                      aff4_attribute)()
       if not isinstance(attr, rdfvalue.RDFValue):
         raise artifact_lib.ArtifactDefinitionError(
-            "Bad RDFMapping, bad attribute %s for %s" %
-            (aff4_attribute, rdf_name))
+            f"Bad RDFMapping, bad attribute {aff4_attribute} for {rdf_name}")
 
   def testUploadArtifactYamlFile(self):
     test_artifacts_file = os.path.join(

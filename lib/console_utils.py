@@ -30,15 +30,14 @@ def FormatISOTime(t):
 def SearchClients(query_str, token=None, limit=1000):
   """Search indexes for clients. Returns list (client, hostname, os version)."""
   client_schema = aff4.AFF4Object.classes["VFSGRRClient"].SchemaCls
-  results = []
   result_urns = search.SearchClients(query_str, max_results=limit, token=token)
   result_set = aff4.FACTORY.MultiOpen(result_urns, token=token)
-  for result in result_set:
-    results.append((result,
-                    str(result.Get(client_schema.HOSTNAME)),
-                    str(result.Get(client_schema.OS_VERSION)),
-                    str(result.Get(client_schema.PING))))
-  return results
+  return [(
+      result,
+      str(result.Get(client_schema.HOSTNAME)),
+      str(result.Get(client_schema.OS_VERSION)),
+      str(result.Get(client_schema.PING)),
+  ) for result in result_set]
 
 
 def DownloadDir(aff4_path, output_dir, bufsize=8192, preserve_path=True):
@@ -72,10 +71,8 @@ def DownloadDir(aff4_path, output_dir, bufsize=8192, preserve_path=True):
     logging.info(u"Downloading %s to %s", child.urn, outfile)
     with open(outfile, "wb") as out_fd:
       try:
-        buf = child.Read(bufsize)
-        while buf:
+        while buf := child.Read(bufsize):
           out_fd.write(buf)
-          buf = child.Read(bufsize)
       except IOError as e:
         logging.error("Failed to read %s. Err: %s", child.urn, e)
 
@@ -218,9 +215,9 @@ def ApprovalCreateRaw(aff4_path, reason="", expire_in=60 * 60 * 24 * 7,
 
   # Add approvals indicating they were approved by fake "raw" mode users.
   approval_request.AddAttribute(
-      approval_request.Schema.APPROVER("%s1-raw" % token.username))
+      approval_request.Schema.APPROVER(f"{token.username}1-raw"))
   approval_request.AddAttribute(
-      approval_request.Schema.APPROVER("%s-raw2" % token.username))
+      approval_request.Schema.APPROVER(f"{token.username}-raw2"))
   approval_request.Close(sync=True)
 
 

@@ -33,20 +33,18 @@ class ApiAff4Renderer(api_call_renderers.ApiCallRenderer):
 
   @classmethod
   def GetAdditionalArgsTypes(cls):
-    results = {}
-    for aff4_renderer_cls in (api_aff4_object_renderers.
-                              ApiAFF4ObjectRendererBase.classes.values()):
-      results[aff4_renderer_cls.aff4_type] = aff4_renderer_cls.args_type
-    return results
+    return {
+        aff4_renderer_cls.aff4_type: aff4_renderer_cls.args_type
+        for aff4_renderer_cls in (
+            api_aff4_object_renderers.ApiAFF4ObjectRendererBase.classes.values())
+    }
 
   additional_args_types = GetAdditionalArgsTypes
 
   def Render(self, args, token=None):
     aff4_object = aff4.FACTORY.Open(args.aff4_path, token=token)
-    rendered_data = api_aff4_object_renderers.RenderAFF4Object(
+    return api_aff4_object_renderers.RenderAFF4Object(
         aff4_object, [x.args for x in args.additional_args])
-
-    return rendered_data
 
 
 class ApiAff4IndexRendererArgs(rdfvalue.RDFProtoStruct):
@@ -63,9 +61,7 @@ class ApiAff4IndexRenderer(api_call_renderers.ApiCallRenderer):
 
     aff4_path = rdfvalue.RDFURN(args.aff4_path)
     index_prefix = "index:dir/"
-    for predicate, _, timestamp in data_store.DB.ResolveRegex(
-        aff4_path, index_prefix + ".+", token=token,
-        timestamp=data_store.DB.NEWEST_TIMESTAMP, limit=1000000):
+    for predicate, _, timestamp in data_store.DB.ResolveRegex(aff4_path, f"{index_prefix}.+", token=token, timestamp=data_store.DB.NEWEST_TIMESTAMP, limit=1000000):
 
       urn = aff4_path.Add(predicate[len(index_prefix):])
       encoded_urns.append([api_value_renderers.RenderValue(urn),

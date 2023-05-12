@@ -107,17 +107,15 @@ class PlistExpander(objectfilter.ValueExpander):
   def _AtNonLeaf(self, attr_value, path):
     """Makes dictionaries expandable when dealing with plists."""
     if isinstance(attr_value, dict):
-      for value in self.Expand(attr_value, path[1:]):
-        yield value
+      yield from self.Expand(attr_value, path[1:])
     else:
-      for v in objectfilter.ValueExpander._AtNonLeaf(self, attr_value, path):
-        yield v
+      yield from objectfilter.ValueExpander._AtNonLeaf(self, attr_value, path)
 
 
 class PlistFilterImplementation(objectfilter.BaseFilterImplementation):
   FILTERS = {}
-  FILTERS.update(objectfilter.BaseFilterImplementation.FILTERS)
-  FILTERS.update({"ValueExpander": PlistExpander})
+  FILTERS |= objectfilter.BaseFilterImplementation.FILTERS
+  FILTERS["ValueExpander"] = PlistExpander
 
 
 def PlistValueToPlainValue(plist):
@@ -134,16 +132,12 @@ def PlistValueToPlainValue(plist):
   """
 
   if isinstance(plist, dict):
-    ret_value = dict()
-    for key, value in plist.items():
-      ret_value[key] = PlistValueToPlainValue(value)
-    return ret_value
+    return {key: PlistValueToPlainValue(value) for key, value in plist.items()}
   elif isinstance(plist, list):
     return [PlistValueToPlainValue(value) for value in plist]
   elif isinstance(plist, binplist.RawValue):
     return plist.value
-  elif (isinstance(plist, binplist.CorruptReference)
-        or isinstance(plist, binplist.UnknownObject)):
+  elif isinstance(plist, (binplist.CorruptReference, binplist.UnknownObject)):
     return None
   elif isinstance(plist, datetime.datetime):
     return (calendar.timegm(plist.utctimetuple()) * 1000000) + plist.microsecond

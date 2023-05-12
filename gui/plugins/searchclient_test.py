@@ -64,19 +64,19 @@ class TestNavigatorView(SearchClientTestBase):
 
   def testOnlineClientStatus(self):
     client_id = self.CreateClient()
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsElementPresent, "css=img[src$='online.png']")
 
   def testOneDayClientStatus(self):
     client_id = self.CreateClient(
         last_ping=rdfvalue.RDFDatetime().Now() - rdfvalue.Duration("1h"))
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsElementPresent, "css=img[src$='online-1d.png']")
 
   def testOfflineClientStatus(self):
     client_id = self.CreateClient(
         last_ping=rdfvalue.RDFDatetime().Now() - rdfvalue.Duration("1d"))
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsElementPresent, "css=img[src$='offline.png']")
 
   def testOnlineClientStatusInClientSearch(self):
@@ -116,7 +116,7 @@ class TestNavigatorView(SearchClientTestBase):
 
   def testLatestCrashesStatusIsNotDisplayedWhenThereAreNoCrashes(self):
     client_id = self.CreateClient()
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsTextPresent, "Host-0")
     self.WaitUntilNot(self.IsTextPresent, "Last crash")
 
@@ -128,8 +128,8 @@ class TestNavigatorView(SearchClientTestBase):
       self.GrantClientApproval(client_id)
 
     with utils.Stubber(time, "time",
-                       lambda: float(timestamp.AsSecondsFromEpoch())):
-      self.Open("/#c=" + str(client_id))
+                         lambda: float(timestamp.AsSecondsFromEpoch())):
+      self.Open(f"/#c={str(client_id)}")
       self.WaitUntil(self.IsTextPresent, "Last crash")
       self.WaitUntil(self.IsTextPresent, "5 seconds ago")
 
@@ -142,8 +142,8 @@ class TestNavigatorView(SearchClientTestBase):
       self.GrantClientApproval(client_id)
 
     with utils.Stubber(time, "time",
-                       lambda: float(timestamp.AsSecondsFromEpoch())):
-      self.Open("/#c=" + str(client_id))
+                         lambda: float(timestamp.AsSecondsFromEpoch())):
+      self.Open(f"/#c={str(client_id)}")
       self.WaitUntil(self.IsTextPresent, "Last crash")
       self.WaitUntil(self.IsTextPresent, "5 seconds ago")
       # This one is not displayed, because it exceeds the limit.
@@ -157,8 +157,8 @@ class TestNavigatorView(SearchClientTestBase):
       self.GrantClientApproval(client_id)
 
     with utils.Stubber(time, "time",
-                       lambda: float(timestamp.AsSecondsFromEpoch())):
-      self.Open("/#c=" + str(client_id))
+                         lambda: float(timestamp.AsSecondsFromEpoch())):
+      self.Open(f"/#c={str(client_id)}")
       self.WaitUntil(self.IsTextPresent, "Host-0")
       # This one is not displayed, because it happened more than 24 hours ago.
       self.WaitUntilNot(self.IsTextPresent, "Last crash")
@@ -173,7 +173,7 @@ class TestNavigatorView(SearchClientTestBase):
 
     # There should be a result row with the client id.
     self.WaitUntil(self.IsElementPresent,
-                   "css=tr:contains('%s')" % client_id.Basename())
+                   f"css=tr:contains('{client_id.Basename()}')")
     # But it shouldn't have the skull.
     self.WaitUntilNot(
         self.IsElementPresent,
@@ -192,7 +192,7 @@ class TestNavigatorView(SearchClientTestBase):
 
     # There should be a result row with the client id.
     self.WaitUntil(self.IsElementPresent,
-                   "css=tr:contains('%s')" % client_id.Basename())
+                   f"css=tr:contains('{client_id.Basename()}')")
     # But it shouldn't have the skull.
     self.WaitUntilNot(
         self.IsElementPresent,
@@ -211,7 +211,7 @@ class TestNavigatorView(SearchClientTestBase):
 
     # There should be a result row with the client id.
     self.WaitUntil(self.IsElementPresent,
-                   "css=tr:contains('%s')" % client_id.Basename())
+                   f"css=tr:contains('{client_id.Basename()}')")
     # And it should have the skull.
     self.WaitUntil(
         self.IsElementPresent,
@@ -226,7 +226,7 @@ class TestNavigatorView(SearchClientTestBase):
 
     # There should be a result row with the client id.
     self.WaitUntil(self.IsElementPresent,
-                   "css=tr:contains('%s')" % client_id.Basename())
+                   f"css=tr:contains('{client_id.Basename()}')")
 
     # But it shouldn't have the disk icon.
     self.WaitUntilNot(
@@ -242,7 +242,7 @@ class TestNavigatorView(SearchClientTestBase):
 
     # There should be a result row with the client id.
     self.WaitUntil(self.IsElementPresent,
-                   "css=tr:contains('%s')" % client_id.Basename())
+                   f"css=tr:contains('{client_id.Basename()}')")
 
     # With the disk icon.
     self.WaitUntil(
@@ -252,13 +252,13 @@ class TestNavigatorView(SearchClientTestBase):
 
   def testDiskWarningIsNotDisplayed(self):
     client_id = self.CreateClientWithVolumes()
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsTextPresent, "Host-0")
     self.WaitUntilNot(self.IsTextPresent, "Disk free space")
 
   def testDiskWarningIsDisplayed(self):
     client_id = self.CreateClientWithVolumes(available=1)
-    self.Open("/#c=" + str(client_id))
+    self.Open(f"/#c={str(client_id)}")
     self.WaitUntil(self.IsTextPresent, "Host-0")
     self.WaitUntil(self.IsTextPresent, "Disk free space")
 

@@ -75,7 +75,7 @@ class GRREProcessObjectRenderer(GRRRekallViewerObjectRenderer):
   def _Flatten(self, prefix, item):
     result = []
     for k, v in item.items():
-      next_prefix = "%s.%s" % (prefix, k)
+      next_prefix = f"{prefix}.{k}"
 
       if isinstance(v, dict):
         result.extend(self._Flatten(next_prefix, v))

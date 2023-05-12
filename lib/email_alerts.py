@@ -26,22 +26,17 @@ def AddEmailDomain(address):
   suffix = config_lib.CONFIG["Logging.domain"]
   if isinstance(address, rdfvalue.DomainEmailAddress):
     address = str(address)
-  if suffix and "@" not in address:
-    return address + "@%s" % suffix
-  return address
+  return f"{address}@{suffix}" if suffix and "@" not in address else address
 
 
 def SplitEmailsAndAppendEmailDomain(address_list):
   """Splits a string of comma-separated emails, appending default domain."""
-  result = []
   # Process email addresses, and build up a list.
   if isinstance(address_list, rdfvalue.DomainEmailAddress):
     address_list = [str(address_list)]
   elif isinstance(address_list, basestring):
     address_list = [address for address in address_list.split(",") if address]
-  for address in address_list:
-    result.append(AddEmailDomain(address))
-  return result
+  return [AddEmailDomain(address) for address in address_list]
 
 
 def SendEmail(to_addresses, from_address, subject, message, attachments=None,
@@ -63,7 +58,6 @@ def SendEmail(to_addresses, from_address, subject, message, attachments=None,
   Raises:
     RuntimeError: for problems connecting to smtp server.
   """
-  headers = headers or {}
   msg = MIMEMultipart("alternative")
   if is_html:
     text = RemoveHtmlTags(message)
@@ -98,6 +92,7 @@ def SendEmail(to_addresses, from_address, subject, message, attachments=None,
   if message_id:
     msg.add_header("Message-ID", message_id)
 
+  headers = headers or {}
   for header, value in headers.iteritems():
     msg.add_header(header, value)
 
@@ -115,9 +110,8 @@ def SendEmail(to_addresses, from_address, subject, message, attachments=None,
     s.sendmail(from_address, to_addresses, msg.as_string())
     s.quit()
   except (socket.error, smtplib.SMTPException) as e:
-    raise RuntimeError("Could not connect to SMTP server to send email. Please "
-                       "check config option Worker.smtp_server. Currently set "
-                       "to %s. Error: %s" %
-                       (config_lib.CONFIG["Worker.smtp_server"], e))
+    raise RuntimeError(
+        f'Could not connect to SMTP server to send email. Please check config option Worker.smtp_server. Currently set to {config_lib.CONFIG["Worker.smtp_server"]}. Error: {e}'
+    )
 
 

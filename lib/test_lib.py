@@ -125,8 +125,7 @@ class FlowOrderTest(flow.GRRFlow):
     """Record the message id for testing."""
     self.messages = []
 
-    for _ in responses:
-      self.messages.append(responses.message.response_id)
+    self.messages.extend(responses.message.response_id for _ in responses)
 
 
 class SendingFlowArgs(rdfvalue.RDFProtoStruct):
@@ -140,7 +139,7 @@ class SendingFlow(flow.GRRFlow):
   @flow.StateHandler(next_state="Process")
   def Start(self, unused_response=None):
     """Just send a few messages."""
-    for unused_i in range(0, self.args.message_count):
+    for _ in range(0, self.args.message_count):
       self.CallClient("ReadBuffer", offset=0, length=100, next_state="Process")
 
 
@@ -262,8 +261,7 @@ class MockSecurityManager(access_control.BasicAccessControlManager):
 
     for access in requested_access:
       if access in self.forbidden_datastore_access:
-        raise access_control.UnauthorizedAccess("%s access is is not allowed" %
-                                                access)
+        raise access_control.UnauthorizedAccess(f"{access} access is is not allowed")
 
     return True
 
@@ -436,7 +434,8 @@ class GRRBaseTest(unittest.TestCase):
 
   def CreateUser(self, username):
     """Creates a user."""
-    user = aff4.FACTORY.Create("aff4:/users/%s" % username, "GRRUser",
+    user = aff4.FACTORY.Create(f"aff4:/users/{username}",
+                               "GRRUser",
                                token=self.token.SetUID())
     user.Flush()
     return user
@@ -512,7 +511,7 @@ class GRRBaseTest(unittest.TestCase):
       client_ids.append(client_id)
 
       with aff4.FACTORY.Create(client_id, "VFSGRRClient",
-                               token=self.token) as fd:
+                                   token=self.token) as fd:
         cert = rdfvalue.RDFX509Cert(
             self.ClientCertFromPrivateKey(
                 config_lib.CONFIG["Client.private_key"]).as_pem())
@@ -522,8 +521,8 @@ class GRRBaseTest(unittest.TestCase):
         info.client_name = "GRR Monitor"
         fd.Set(fd.Schema.CLIENT_INFO, info)
         fd.Set(fd.Schema.PING, rdfvalue.RDFDatetime().Now())
-        fd.Set(fd.Schema.HOSTNAME("Host-%s" % i))
-        fd.Set(fd.Schema.FQDN("Host-%s.example.com" % i))
+        fd.Set(fd.Schema.HOSTNAME(f"Host-{i}"))
+        fd.Set(fd.Schema.FQDN(f"Host-{i}.example.com"))
         fd.Set(fd.Schema.MAC_ADDRESS("aabbccddee%02x\nbbccddeeff%02x" % (i, i)))
         fd.Set(fd.Schema.HOST_IPS("192.168.0.%d\n2001:abcd::%x" % (i, i)))
 
@@ -600,10 +599,10 @@ class GRRBaseTest(unittest.TestCase):
       raise RuntimeError("Bin: %s exited, but should have stayed running.\n%s\n"
                          % (stdout.getvalue(), cmd))
 
-    if should_exit and check_exit_code:
-      if proc.returncode != 0:
-        raise RuntimeError("Bin: %s should have returned exit code 0 but got "
-                           "%s" % (cmd, proc.returncode))
+    if should_exit and check_exit_code and proc.returncode != 0:
+      raise RuntimeError(
+          f"Bin: {cmd} should have returned exit code 0 but got {proc.returncode}"
+      )
 
   def ClientCertFromPrivateKey(self, private_key):
     communicator = comms.ClientCommunicator(private_key=private_key)
@@ -877,34 +876,28 @@ class GRRSeleniumTest(GRRBaseTest):
   def WaitUntil(self, condition_cb, *args):
     for _ in range(int(self.duration / self.sleep_time)):
       try:
-        res = condition_cb(*args)
-        if res:
+        if res := condition_cb(*args):
           return res
 
-      # The element might not exist yet and selenium could raise here. (Also
-      # Selenium raises Exception not StandardError).
       except Exception as e:  # pylint: disable=broad-except
         logging.warn("Selenium raised %s", utils.SmartUnicode(e))
 
       time.sleep(self.sleep_time)
 
-    raise RuntimeError("condition not met, body is: %s" %
-                       self.driver.find_element_by_tag_name("body").text)
+    raise RuntimeError(
+        f'condition not met, body is: {self.driver.find_element_by_tag_name("body").text}'
+    )
 
   def ClickUntil(self, target, condition_cb, *args):
     for _ in range(int(self.duration / self.sleep_time)):
       try:
-        res = condition_cb(*args)
-        if res:
+        if res := condition_cb(*args):
           return res
 
-      # The element might not exist yet and selenium could raise here. (Also
-      # Selenium raises Exception not StandardError).
       except Exception as e:  # pylint: disable=broad-except
         logging.warn("Selenium raised %s", utils.SmartUnicode(e))
 
-      element = self.GetElement(target)
-      if element:
+      if element := self.GetElement(target):
         try:
           element.click()
         except exceptions.WebDriverException:
@@ -912,8 +905,9 @@ class GRRSeleniumTest(GRRBaseTest):
 
       time.sleep(self.sleep_time)
 
-    raise RuntimeError("condition not met, body is: %s" %
-                       self.driver.find_element_by_tag_name("body").text)
+    raise RuntimeError(
+        f'condition not met, body is: {self.driver.find_element_by_tag_name("body").text}'
+    )
 
   def _FindElement(self, selector):
     try:
@@ -923,13 +917,12 @@ class GRRSeleniumTest(GRRBaseTest):
       selector_type = None
 
     if selector_type == "css":
-      elems = self.driver.execute_script(
-          "return $(\"" + effective_selector.replace("\"", "\\\"") + "\");")
-      if not elems:
-        raise exceptions.NoSuchElementException()
-      else:
+      if elems := self.driver.execute_script(
+          "return $(\"" + effective_selector.replace("\"", "\\\"") + "\");"):
         return elems[0]
 
+      else:
+        raise exceptions.NoSuchElementException()
     elif selector_type == "link":
       links = self.driver.find_elements_by_partial_link_text(effective_selector)
       for l in links:
@@ -952,7 +945,7 @@ class GRRSeleniumTest(GRRBaseTest):
       else:
         return self.driver.find_element_by_id(effective_selector)
     else:
-      raise RuntimeError("unknown selector type %s" % selector_type)
+      raise RuntimeError(f"unknown selector type {selector_type}")
 
   @SeleniumAction
   def Open(self, url):
@@ -1002,10 +995,7 @@ class GRRSeleniumTest(GRRBaseTest):
 
   def AllTextsPresent(self, texts):
     body = self.driver.find_element_by_tag_name("body").text
-    for text in texts:
-      if utils.SmartUnicode(text) not in body:
-        return False
-    return True
+    return all(utils.SmartUnicode(text) in body for text in texts)
 
   def IsVisible(self, target):
     element = self.GetElement(target)
@@ -1044,9 +1034,8 @@ class GRRSeleniumTest(GRRBaseTest):
 
     # We experienced that Selenium sometimes swallows the last character of the
     # text sent. Raising an exception here will just retry in that case.
-    if not end_with_enter:
-      if text != self.GetValue(target):
-        raise exceptions.WebDriverException("Send_keys did not work correctly.")
+    if not end_with_enter and text != self.GetValue(target):
+      raise exceptions.WebDriverException("Send_keys did not work correctly.")
 
   @SeleniumAction
   def Click(self, target):
@@ -1089,7 +1078,7 @@ class GRRSeleniumTest(GRRBaseTest):
 
   def GetCssCount(self, target):
     if not target.startswith("css="):
-      raise ValueError("invalid target for GetCssCount: " + target)
+      raise ValueError(f"invalid target for GetCssCount: {target}")
 
     return len(self.driver.find_elements_by_css_selector(target[4:]))
 
@@ -1106,8 +1095,9 @@ class GRRSeleniumTest(GRRBaseTest):
 
       time.sleep(self.sleep_time)
 
-    raise RuntimeError("condition not met, body is: %s" %
-                       self.driver.find_element_by_tag_name("body").text)
+    raise RuntimeError(
+        f'condition not met, body is: {self.driver.find_element_by_tag_name("body").text}'
+    )
 
   def WaitUntilContains(self, target, condition_cb, *args):
     data = ""
@@ -1252,7 +1242,7 @@ class GRRTestLoader(unittest.TestLoader):
     for test_name in super(GRRTestLoader, self).getTestCaseNames(testCaseClass):
       test_method = getattr(testCaseClass, test_name)
       # If the method is not tagged, it will be labeled "small".
-      test_labels = getattr(test_method, "labels", set(["small"]))
+      test_labels = getattr(test_method, "labels", {"small"})
       if self.labels and not self.labels.intersection(test_labels):
         continue
 
@@ -1401,11 +1391,9 @@ class MockClient(object):
           self.PushToStateQueue(manager, message, response_id=response_id,
                                 payload=status,
                                 type=rdfvalue.GrrMessage.Type.STATUS)
-        else:
-          # Status may be None only if status_message_enforced is False.
-          if self.status_message_enforced:
-            raise RuntimeError("status message can only be None when "
-                               "status_message_enforced is False")
+        elif self.status_message_enforced:
+          raise RuntimeError("status message can only be None when "
+                             "status_message_enforced is False")
 
         # Additionally schedule a task for the worker
         manager.QueueNotification(session_id=message.session_id,
@@ -1539,9 +1527,9 @@ def CheckFlowErrors(total_flows, token=None):
     if flow_obj.state.context.state != rdfvalue.Flow.State.TERMINATED:
       if flags.FLAGS.debug:
         pdb.set_trace()
-      raise RuntimeError("Flow %s completed in state %s" % (
-          flow_obj.state.context.args.flow_name,
-          flow_obj.state.context.state))
+      raise RuntimeError(
+          f"Flow {flow_obj.state.context.args.flow_name} completed in state {flow_obj.state.context.state}"
+      )
 
 
 def TestFlowHelper(flow_urn_or_cls_name, client_mock=None, client_id=None,
@@ -1580,16 +1568,10 @@ def TestFlowHelper(flow_urn_or_cls_name, client_mock=None, client_id=None,
         notification_event=notification_event, sync=sync,
         token=token, **kwargs)
 
-  total_flows = set()
-  total_flows.add(session_id)
-
+  total_flows = {session_id}
   # Run the client and worker until nothing changes any more.
   while True:
-    if client_mock:
-      client_processed = client_mock.Next()
-    else:
-      client_processed = 0
-
+    client_processed = client_mock.Next() if client_mock else 0
     flows_run = []
     for flow_run in worker_mock.Next():
       total_flows.add(flow_run)
@@ -1695,11 +1677,7 @@ def TestHuntHelperWithMultipleMocks(client_mocks, check_flow_errors=False,
 
   # Run the clients and worker until nothing changes any more.
   while True:
-    client_processed = 0
-
-    for client_mock in client_mocks:
-      client_processed += client_mock.Next()
-
+    client_processed = sum(client_mock.Next() for client_mock in client_mocks)
     flows_run = []
 
     for flow_run in worker_mock.Next():
@@ -1726,17 +1704,13 @@ FIXTURE_TIME = 1332788833
 
 def FilterFixture(fixture=None, regex="."):
   """Returns a sub fixture by only returning objects which match the regex."""
-  result = []
   regex = re.compile(regex)
 
   if fixture is None:
     fixture = client_fixture.VFS
 
-  for path, attributes in fixture:
-    if regex.match(path):
-      result.append((path, attributes))
-
-  return result
+  return [(path, attributes) for path, attributes in fixture
+          if regex.match(path)]
 
 
 def SetLabel(*labels):
@@ -1822,20 +1796,18 @@ class ClientFixture(object):
             rdfvalue_object = attribute(value)
 
           # If we don't already have a pathspec, try and get one from the stat.
-          if aff4_object.Get(aff4_object.Schema.PATHSPEC) is None:
-            # If the attribute was a stat, it has a pathspec nested in it.
-            # We should add that pathspec as an attribute.
-            if attribute.attribute_type == rdfvalue.StatEntry:
-              stat_object = attribute.attribute_type.FromTextFormat(
-                  utils.SmartStr(value))
-              if stat_object.pathspec:
-                pathspec_attribute = aff4.Attribute(
-                    "aff4:pathspec", rdfvalue.PathSpec,
-                    "The pathspec used to retrieve "
-                    "this object from the client.",
-                    "pathspec")
-                aff4_object.AddAttribute(pathspec_attribute,
-                                         stat_object.pathspec)
+          if (aff4_object.Get(aff4_object.Schema.PATHSPEC) is None
+              and attribute.attribute_type == rdfvalue.StatEntry):
+            stat_object = attribute.attribute_type.FromTextFormat(
+                utils.SmartStr(value))
+            if stat_object.pathspec:
+              pathspec_attribute = aff4.Attribute(
+                  "aff4:pathspec", rdfvalue.PathSpec,
+                  "The pathspec used to retrieve "
+                  "this object from the client.",
+                  "pathspec")
+              aff4_object.AddAttribute(pathspec_attribute,
+                                       stat_object.pathspec)
 
           if attribute in ["aff4:content", "aff4:content"]:
             # For AFF4MemoryStreams we need to call Write() instead of
@@ -1891,9 +1863,7 @@ class ClientVFSHandlerFixture(vfs.VFSHandler):
 
       stat = rdfvalue.StatEntry()
       args = {"client_id": "C.1234"}
-      attrs = attributes.get("aff4:stat")
-
-      if attrs:
+      if attrs := attributes.get("aff4:stat"):
         attrs %= args  # Remove any %% and interpolate client_id.
         stat = rdfvalue.StatEntry.FromTextFormat(utils.SmartStr(attrs))
 
@@ -1917,7 +1887,7 @@ class ClientVFSHandlerFixture(vfs.VFSHandler):
       parts = path.split("/")
       if vfs_type == "VFSFile":
         # If its a file, the last component is a value which is case sensitive.
-        lower_parts = [x.lower() for x in parts[0:-1]]
+        lower_parts = [x.lower() for x in parts[:-1]]
         lower_parts.append(parts[-1])
         path = utils.Join(*lower_parts)
       else:
@@ -1990,16 +1960,15 @@ class ClientVFSHandlerFixture(vfs.VFSHandler):
                                                             "VFSFile"))
     if stat_data:
       return stat_data[1]   # Strip the vfs_type.
-    else:
-      # We return some fake data, this makes writing tests easier for some
-      # things but we give an error to the tester as it is often not what you
-      # want.
-      logging.warn("Fake value for %s under %s", self.path, self.prefix)
-      return rdfvalue.StatEntry(pathspec=self.pathspec,
-                                st_mode=16877,
-                                st_size=12288,
-                                st_atime=1319796280,
-                                st_dev=1)
+    # We return some fake data, this makes writing tests easier for some
+    # things but we give an error to the tester as it is often not what you
+    # want.
+    logging.warn("Fake value for %s under %s", self.path, self.prefix)
+    return rdfvalue.StatEntry(pathspec=self.pathspec,
+                              st_mode=16877,
+                              st_size=12288,
+                              st_atime=1319796280,
+                              st_dev=1)
 
 
 class FakeRegistryVFSHandler(ClientVFSHandlerFixture):
@@ -2023,7 +1992,7 @@ class FakeTestDataVFSHandler(ClientVFSHandlerFixture):
     test_data_path = os.path.join(config_lib.CONFIG["Test.data_dir"],
                                   os.path.basename(self.path))
     if not os.path.exists(test_data_path):
-      raise IOError("Could not find %s" % test_data_path)
+      raise IOError(f"Could not find {test_data_path}")
 
     data = open(test_data_path, "r").read()[self.offset:self.offset + length]
 
@@ -2121,9 +2090,15 @@ class TestRekallRepositoryProfileServer(rekall_profile_server.ProfileServer):
 
   def GetProfileByName(self, profile_name, version="v1.0"):
     try:
-      profile_data = open(os.path.join(
-          config_lib.CONFIG["Test.data_dir"], "profiles", version,
-          profile_name + ".gz"), "rb").read()
+      profile_data = open(
+          os.path.join(
+              config_lib.CONFIG["Test.data_dir"],
+              "profiles",
+              version,
+              f"{profile_name}.gz",
+          ),
+          "rb",
+      ).read()
 
       self.profiles_served += 1
 

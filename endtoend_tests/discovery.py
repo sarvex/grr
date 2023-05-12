@@ -62,8 +62,8 @@ class TestClientInterrogateEndToEnd(base.AutomatedTest):
   def _CheckAttributes(self, attributes, fd):
     for attribute in attributes:
       value = fd.Get(attribute)
-      self.assertTrue(value is not None, "Attribute %s is None." % attribute)
-      self.assertTrue(str(value), "str(%s) is empty" % attribute)
+      self.assertTrue(value is not None, f"Attribute {attribute} is None.")
+      self.assertTrue(str(value), f"str({attribute}) is empty")
 
   def CheckFlow(self):
     fd = aff4.FACTORY.Open(self.client_id, mode="r", token=self.token)
@@ -83,7 +83,7 @@ class TestClientInterrogateEndToEnd(base.AutomatedTest):
     complete_user = False
     for user in kb.users:
       value = user.Get("username")
-      self.assertTrue(value is not None, "username is none for user: %s" % user)
+      self.assertTrue(value is not None, f"username is none for user: {user}")
       self.assertTrue(utils.SmartUnicode(value))
 
       if system == "Windows":
@@ -96,4 +96,4 @@ class TestClientInterrogateEndToEnd(base.AutomatedTest):
         complete_user = user.Get("uid") is not None
 
     self.assertTrue(complete_user,
-                    "No users with complete KB user attributes: %s" % kb.users)
+                    f"No users with complete KB user attributes: {kb.users}")

@@ -524,9 +524,7 @@ class CommonTransaction(Transaction):
     self.expires = None
 
   def CheckLease(self):
-    if not self.expires:
-      return 0
-    return max(0, self.expires - time.time())
+    return 0 if not self.expires else max(0, self.expires - time.time())
 
   def DeleteAttribute(self, attribute):
     self.to_delete.add(attribute)

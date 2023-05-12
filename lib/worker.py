@@ -67,7 +67,7 @@ class GRRWorker(object):
     Raises:
       RuntimeError: If the token is not provided.
     """
-    logging.info("started worker with queues: " + str(queues))
+    logging.info(f"started worker with queues: {str(queues)}")
     self.queues = queues
     self.queued_flows = utils.TimeBasedCache(max_size=10, max_age=60)
 
@@ -97,11 +97,7 @@ class GRRWorker(object):
     """Event loop."""
     try:
       while 1:
-        if master.MASTER_WATCHER.IsMaster():
-          processed = self.RunOnce()
-        else:
-          processed = 0
-
+        processed = self.RunOnce() if master.MASTER_WATCHER.IsMaster() else 0
         if processed == 0:
 
           if time.time() - self.last_active > self.SHORT_POLL_TIME:
@@ -141,20 +137,15 @@ class GRRWorker(object):
       stats.STATS.RecordEvent("worker_time_to_retrieve_notifications",
                               time.time() - fetch_messages_start)
 
-      # Process stuck flows first
-      stuck_flows = notifications_by_priority.pop(
-          queue_manager.STUCK_PRIORITY, [])
-
-      if stuck_flows:
+      if stuck_flows := notifications_by_priority.pop(
+          queue_manager.STUCK_PRIORITY, []):
         self.ProcessStuckFlows(stuck_flows, queue_manager)
 
       notifications_available = []
       for priority in sorted(notifications_by_priority, reverse=True):
-        for notification in notifications_by_priority[priority]:
-          # Filter out session ids we already tried to lock but failed.
-          if notification.session_id not in self.queued_flows:
-            notifications_available.append(notification)
-
+        notifications_available.extend(
+            notification for notification in notifications_by_priority[priority]
+            if notification.session_id not in self.queued_flows)
       try:
         # If we spent too much time processing what we have so far, the
         # active_sessions list might not be current. We therefore break here

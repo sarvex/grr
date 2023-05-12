@@ -81,7 +81,7 @@ class _DataStoreTest(test_lib.GRRBaseTest):
 
     data_store.DB.DeleteSubject(self.test_row, token=self.token)
     for i in range(20):
-      data_store.DB.DeleteSubject("aff4:/row:%s" % i, token=self.token)
+      data_store.DB.DeleteSubject(f"aff4:/row:{i}", token=self.token)
 
     data_store.DB.Flush()
 
@@ -105,7 +105,7 @@ class _DataStoreTest(test_lib.GRRBaseTest):
     # Ensure that setting a value is immediately available.
     data_store.DB.Set(self.test_row, predicate, value, token=self.token)
     time.sleep(1)
-    data_store.DB.Set(self.test_row + "X", predicate, value, token=self.token)
+    data_store.DB.Set(f"{self.test_row}X", predicate, value, token=self.token)
     (stored_proto, _) = data_store.DB.Resolve(
         self.test_row, predicate, token=self.token)
 
@@ -396,13 +396,23 @@ class _DataStoreTest(test_lib.GRRBaseTest):
     # Make some rows.
     rows = []
     for i in range(10):
-      row_name = "aff4:/row:%s" % i
+      row_name = f"aff4:/row:{i}"
       data_store.DB.Set(
-          row_name, "metadata:%s" % i, "v%d" % i, timestamp=i + 10,
-          replace=False, token=self.token)
+          row_name,
+          f"metadata:{i}",
+          "v%d" % i,
+          timestamp=i + 10,
+          replace=False,
+          token=self.token,
+      )
       data_store.DB.Set(
-          row_name, "metadata:%s" % i, "v%d" % i, timestamp=i + 20,
-          replace=False, token=self.token)
+          row_name,
+          f"metadata:{i}",
+          "v%d" % i,
+          timestamp=i + 20,
+          replace=False,
+          token=self.token,
+      )
       rows.append(row_name)
 
     # Query for newest ts.
@@ -482,17 +492,21 @@ class _DataStoreTest(test_lib.GRRBaseTest):
     # Make some rows.
     rows = []
     for i in range(5):
-      row_name = "aff4:/row:%s" % i
+      row_name = f"aff4:/row:{i}"
       timestamp = rdfvalue.RDFDatetime(100 + i)
-      data_store.DB.Set(row_name, "metadata:%s" % i, i, timestamp=timestamp,
+      data_store.DB.Set(row_name,
+                        f"metadata:{i}",
+                        i,
+                        timestamp=timestamp,
                         token=self.token)
       rows.append(row_name)
 
     for i in range(5, 10):
-      row_name = "aff4:/row:%s" % i
+      row_name = f"aff4:/row:{i}"
       timestamp = rdfvalue.RDFDatetime(100 + i)
-      data_store.DB.MultiSet(row_name, {"metadata:%s" % i: [i]},
-                             timestamp=timestamp, token=self.token)
+      data_store.DB.MultiSet(row_name, {f"metadata:{i}": [i]},
+                             timestamp=timestamp,
+                             token=self.token)
       rows.append(row_name)
 
     return rows
@@ -500,9 +514,7 @@ class _DataStoreTest(test_lib.GRRBaseTest):
   def _CheckResultTimestamps(self, result, expected_timestamps):
     timestamps = []
     for predicates in result.itervalues():
-      for predicate in predicates:
-        timestamps.append(predicate[2])
-
+      timestamps.extend(predicate[2] for predicate in predicates)
     self.assertListEqual(sorted(timestamps), sorted(expected_timestamps))
 
   def testResolveRegexResultsOrderedInDecreasingTimestampOrder1(self):
@@ -955,9 +967,11 @@ class _DataStoreTest(test_lib.GRRBaseTest):
 
     # Check we can specify a timestamp
     data_store.DB.Set(subject, predicate, "3", timestamp=1000, token=self.token)
-    results = [x for x in data_store.DB.ResolveRegex(subject, "metadata:pred.*",
-                                                     timestamp=(0, 2000),
-                                                     token=self.token)]
+    results = list(
+        data_store.DB.ResolveRegex(subject,
+                                   "metadata:pred.*",
+                                   timestamp=(0, 2000),
+                                   token=self.token))
 
     self.assertEqual(len(results), 1)
     # Timestamp
@@ -974,8 +988,8 @@ class _DataStoreTest(test_lib.GRRBaseTest):
 
     # Check we can specify a timestamp
     data_store.DB.Set(subject, predicate, "3", token=self.token)
-    results = [x for x in data_store.DB.ResolveRegex(subject, "metadata:.*",
-                                                     token=self.token)]
+    results = list(
+        data_store.DB.ResolveRegex(subject, "metadata:.*", token=self.token))
 
     self.assertEqual(len(results), 1)
     # Value
@@ -989,32 +1003,37 @@ class _DataStoreTest(test_lib.GRRBaseTest):
 
     predicates = []
     for i in range(0, 100):
-      predicate = "metadata:predicate" + str(i)
+      predicate = f"metadata:predicate{str(i)}"
       predicates.append(predicate)
-      data_store.DB.Set(subject, predicate, "Cell " + predicate, timestamp=1000,
-                        token=self.token)
+      data_store.DB.Set(
+          subject,
+          predicate,
+          f"Cell {predicate}",
+          timestamp=1000,
+          token=self.token,
+      )
 
-    results = [x for x in data_store.DB.ResolveMulti(subject, predicates,
-                                                     token=self.token)]
+    results = list(
+        data_store.DB.ResolveMulti(subject, predicates, token=self.token))
 
     self.assertEqual(len(results), 100)
 
     # Value
     for i in range(0, 100):
-      self.assertEqual(results[i][1], "Cell " + predicates[i])
+      self.assertEqual(results[i][1], f"Cell {predicates[i]}")
       self.assertEqual(results[i][0], predicates[i])
 
     # Now try to query for non existent predicates.
     predicates = predicates[:10]
     for i in range(10):
-      predicates.append("metadata:not_existing" + str(i))
+      predicates.append(f"metadata:not_existing{str(i)}")
 
-    results = [x for x in data_store.DB.ResolveMulti(subject, predicates,
-                                                     token=self.token)]
+    results = list(
+        data_store.DB.ResolveMulti(subject, predicates, token=self.token))
 
     self.assertEqual(10, len(results))
     for i in range(0, 10):
-      self.assertEqual(results[i][1], "Cell " + predicates[i])
+      self.assertEqual(results[i][1], f"Cell {predicates[i]}")
       self.assertEqual(results[i][0], predicates[i])
 
   def testAFF4Image(self):
@@ -1492,7 +1511,7 @@ class DataStoreCSVBenchmarks(test_lib.MicroBenchmarks):
       if self.rand.randint(0, 100) > fraction:
         continue
       which = self.rand.randint(0, 2)
-      if which == 0 or which == 1:
+      if which in [0, 1]:
         for j, timestamp_info in predicates.items():
           number_timestamps = len(timestamp_info)
           if which == 0 and len(timestamp_info):
@@ -1665,7 +1684,7 @@ class DataStoreCSVBenchmarks(test_lib.MicroBenchmarks):
         count += 1
         if count == often:
           count = 0
-          predicates_to_delete = [j for j in predicates.keys()[1:]]
+          predicates_to_delete = list(predicates.keys()[1:])
           values_deleted = sum(len(predicates[x])
                                for x in predicates_to_delete)
           self.values -= values_deleted
@@ -1685,9 +1704,7 @@ class DataStoreCSVBenchmarks(test_lib.MicroBenchmarks):
       subject = subjects[i]["name"]
       predicates = subjects[i]["attrs"]
       number_predicates = len(predicates)
-      count_values = 0
-      for j in predicates:
-        count_values += len(predicates[j])
+      count_values = sum(len(predicates[j]) for j in predicates)
       data_store.DB.DeleteSubject(subject, token=self.token)
       self.predicates -= number_predicates
       self.values -= count_values
@@ -1867,26 +1884,25 @@ class DataStoreBenchmarks(test_lib.MicroBenchmarks):
     """Destroys custom data store."""
 
   def GenerateFiles(self, client_id, n, directory="dir/dir"):
-    res = []
-    for i in xrange(n):
-      res.append(rdfvalue.StatEntry(
-          aff4path="aff4:/%s/fs/os/%s/file%d" % (client_id, directory, i),
-          st_mode=33261,
-          st_ino=1026267,
-          st_dev=51713,
-          st_nlink=1,
-          st_uid=0,
-          st_gid=0,
-          st_size=60064,
-          st_atime=1308964274,
-          st_mtime=1285093975,
-          st_ctime=1299502221,
-          st_blocks=128,
-          st_blksize=4096,
-          st_rdev=0,
-          pathspec=rdfvalue.PathSpec(path="/dir/dir/file%d" % i,
-                                     pathtype=0)))
-    return res
+    return [
+        rdfvalue.StatEntry(
+            aff4path="aff4:/%s/fs/os/%s/file%d" % (client_id, directory, i),
+            st_mode=33261,
+            st_ino=1026267,
+            st_dev=51713,
+            st_nlink=1,
+            st_uid=0,
+            st_gid=0,
+            st_size=60064,
+            st_atime=1308964274,
+            st_mtime=1285093975,
+            st_ctime=1299502221,
+            st_blocks=128,
+            st_blksize=4096,
+            st_rdev=0,
+            pathspec=rdfvalue.PathSpec(path="/dir/dir/file%d" % i, pathtype=0),
+        ) for i in xrange(n)
+    ]
 
   def StartFlow(self, client_id):
     flow_id = flow.GRRFlow.StartFlow(client_id=client_id,
