@@ -124,7 +124,7 @@ setup_args = dict(
         "sdist": Sdist,
     },
     install_requires=[
-        "cryptography==3.4.8",
+        "cryptography==41.0.7",
         "distro==1.7.0",
         "fleetspeak==0.1.12",
         "grr-response-proto==%s" % VERSION.get("Version", "packagedepends"),
