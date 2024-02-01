@@ -9,18 +9,18 @@
     "angular-resource": "1.8.2",
     "angular-sanitize": "^1.8.2",
     "angular-ui-bootstrap": "2.5.6",
-    "angular-ui-router": "0.4.2",
+    "angular-ui-router": "0.4.3",
     "bootstrap": "3.4.1",
     "dygraphs": "1.1.1",
-    "firebase": "10.7.1",
+    "firebase": "10.7.2",
     "font-awesome": "4.7.0",
     "jquery": "^3.5.1",
     "jquery-migrate": "3.3.1",
-    "jstree": "3.3.10",
+    "jstree": "3.3.16",
     "marked": "^11.0.1",
     "moment": "^2.29.4",
     "sass": "^1.43.4",
-    "split.js": "1.6.2"
+    "split.js": "1.6.5"
   },
   "devDependencies": {
     "angular-mocks": "1.8.0",
@@ -44,7 +44,7 @@
     "karma-chrome-launcher": "^3.1.0",
     "karma-jasmine": "^2.0.1",
     "karma-ng-html2js-preprocessor": "^1.0.0",
-    "karma-spec-reporter": "0.0.32"
+    "karma-spec-reporter": "0.0.36"
   },
   "repository": {
     "type": "git",
