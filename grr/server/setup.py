@@ -175,7 +175,7 @@ setup_args = dict(
         "grr-response-client-builder==%s"
         % VERSION.get("Version", "packagedepends"),
         "grr-response-core==%s" % VERSION.get("Version", "packagedepends"),
-        "ipython==7.34.0",
+        "ipython==8.10.0",
         "Jinja2==3.1.2",
         "pexpect==4.8.0",
         "portpicker==1.6.0b1",
