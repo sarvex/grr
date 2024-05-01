@@ -149,7 +149,7 @@ setup_args = dict(
 )
 
 if platform.system() == "Linux":
-  setup_args["install_requires"].append("chipsec==1.5.1")
+  setup_args["install_requires"].append("chipsec==1.13.1")
 
 if platform.system() != "Windows":
   setup_args["install_requires"].append("xattr==0.9.7")
