@@ -68,9 +68,9 @@ setup_args = dict(
         # Note: grr-api-client might very much be used as a library and
         # therefore shouldn't pin dependencies that might be shared with other
         # pip packages.
-        "cryptography>=3.3.2",
-        "requests>=2.25.1,<3",
-        "Werkzeug>=2.1.2,<3",
+        "cryptography==42.0.5",
+        "requests==2.31.0",
+        "Werkzeug==2.3.8",
     ],
     extra_requires={
         "shell": [

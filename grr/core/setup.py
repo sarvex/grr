@@ -130,7 +130,7 @@ setup_args = dict(
         "grr-response-proto==%s" % VERSION.get("Version", "packagedepends"),
         "ipaddr==2.2.0",
         "pexpect==4.8.0",
-        "pip>=21.0.1",
+        "pip==24.0",
         "psutil==5.8.0",
         "python-crontab==2.5.1",
         "python-dateutil==2.8.2",
