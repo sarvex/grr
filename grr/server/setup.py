@@ -196,7 +196,7 @@ setup_args = dict(
         # python-mysqldb version of the system we support. This is currently
         # Ubuntu Jammy, see
         # https://packages.ubuntu.com/en/jammy/python3-mysqldb
-        "mysqldatastore": ["mysqlclient>=1.3.10,<=1.4.6"],
+        "mysqldatastore": ["mysqlclient==1.4.6"],
         # TODO: We currently release fleetspeak-server-bin packages
         # for Linux only.
         ':sys_platform=="linux"': [
