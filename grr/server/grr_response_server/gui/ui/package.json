@@ -46,7 +46,7 @@
     "@types/jasminewd2": "2.0.10",
     "@types/luxon": "1.27.1",
     "@types/marked": "0.7.4",
-    "@types/node": "14.14.45",
+    "@types/node": "14.18.63",
     "@types/trusted-types": "1.0.6",
     "codelyzer": "6.0.2",
     "jasmine-core": "3.9.0",
