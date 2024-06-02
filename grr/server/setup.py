@@ -178,7 +178,7 @@ setup_args = dict(
         "ipython==7.34.0",
         "Jinja2==3.1.2",
         "pexpect==4.8.0",
-        "portpicker==1.6.0b1",
+        "portpicker==1.6.0",
         "prometheus_client==0.16.0",
         "pyjwt==2.6.0",
         "pyOpenSSL==21.0.0",  # https://github.com/google/grr/issues/704
