@@ -70,7 +70,7 @@ setup_args = dict(
         # pip packages.
         "cryptography==42.0.7",
         "requests==2.32.3",
-        "Werkzeug>=2.1.2,<3",
+        "Werkzeug>=3.0.3,<4",
     ],
     extra_requires={
         "shell": [

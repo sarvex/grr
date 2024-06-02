@@ -184,7 +184,7 @@ setup_args = dict(
         "pyOpenSSL==21.0.0",  # https://github.com/google/grr/issues/704
         "python-crontab==2.5.1",
         "python-debian==0.1.49",
-        "Werkzeug==2.3.8",
+        "Werkzeug==3.0.3",
     ],
     extras_require={
         # This is an optional component. Install to get MySQL data
